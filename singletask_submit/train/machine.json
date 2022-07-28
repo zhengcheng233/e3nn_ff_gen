@@ -1,0 +1,117 @@
+{
+    "api_version": "1.0",
+    "train" :[
+      {
+        "command": "config_energy_force",
+        "machine": {
+          "batch_type": "DpCloudServer",
+          "context_type": "DpCloudServerContext",
+          "local_root" : "./",
+          "remote_profile":{
+            "email": "2369561300@qq.com",
+            "password": "_cz392781",
+            "program_id":2118,
+              "input_data":{
+                  "api_version":2,
+                  "job_type": "indicate",
+                  "grouped":true,
+                  "job_name": "alloy_train",
+                  "disk_size": 100,
+                  "instance_group_id": 4,
+                  "scass_type":"c8_m32_1 * NVIDIA V100",
+                  "platform": "ali",
+	  "checkpoint_files":["00*/model.ckpt*","00*/checkpoint"],
+                  "checkpoint_time":15,
+                  "image_name":"LBG_nequip_test_1",
+		  "region":"cn-zhangjiakou",
+                  "on_demand":0
+              }
+          }
+        },
+        "resources": {
+          "number_node": 7173344,
+          "local_root":"./",
+          "cpu_per_node": 4,
+          "gpu_per_node": 1,
+          "queue_name": "GPU",
+          "group_size": 1,
+	  "source_list": ["/root/e3_layer.sh"]
+        }
+      }],
+    "model_devi":
+      [{
+        "command": "lmp ",
+        "machine": {
+          "batch_type": "DpCloudServer",
+          "context_type": "DpCloudServerContext",
+          "local_root" : "./",
+          "remote_profile":{
+            "email": "2369561300@qq.com",
+            "password": "_cz392781",
+            "program_id":2118,
+              "input_data":{
+                "api_version":2,
+                "job_type": "indicate",
+		"log_file": "*/model_devi.log",
+                "grouped":true,
+                "job_name": "alloy_model_devi",
+                "checkpoint_files":"sync_files",
+                "checkpoint_time":15,
+                "disk_size": 100,
+                 "instance_group_id": 4,
+                 "scass_type":"c8_m32_1 * NVIDIA V100",
+                "platform": "ali",
+                "image_name":"LBG_DP2.0.1_attn0.2_",
+                "on_demand":0
+              }
+          }
+        },
+        "resources": {
+          "number_node": 6381233,
+          "local_root":"./",
+          "cpu_per_node": 4,
+          "gpu_per_node": 1,
+          "queue_name": "GPU",
+          "group_size": 50
+        }
+      }],
+    "fp":
+      [{
+        "command": "g16 input.com",
+        "machine": {
+          "batch_type": "DpCloudServer",
+          "context_type": "DpCloudServerContext",
+          "local_root" : "./",
+          "remote_profile":{
+            "email": "2369561300@qq.com",
+            "password": "_cz392781",
+            "program_id":2118,
+              "input_data":{
+                "api_version":2,
+                "job_type": "indicate",
+                "log_file": "task*/fp.log",
+                "grouped":true,
+                "job_name": "organic_mol",
+                "checkpoint_files":"sync_files",
+                "checkpoint_time":15,
+                "disk_size": 100,
+                "scass_type":"c8_m32_cpu",
+                "platform": "ali",
+                "image_name":"LBG_Gaussian_1_v2",
+                "on_demand":0
+              }
+          }
+        },
+        "resources": {
+          "number_node": 9570139,
+          "cpu_per_node": 8,
+          "gpu_per_node": 0,
+          "queue_name": "CPU",
+          "group_size": 20,
+          "local_root":"./",
+      "source_list": ["/root/g16.sh"]
+        }
+      }
+    ]
+  }
+  
