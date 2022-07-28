@@ -39,6 +39,7 @@ from dpgen.dispatcher.Dispatcher import Dispatcher, _split_tasks, make_dispatche
 from dpgen.util import sepline
 from dpgen import ROOT_PATH
 from dpgen.generator import run
+import random
 
 template_name = 'template'
 train_name = '00.train'
@@ -72,7 +73,8 @@ from monty.serialization import loadfn
 jdata = loadfn('param.json')
 mdata = loadfn('machine.json')
 mdata = convert_mdata(mdata)
-
+mdata['train'][0]['resources']['number_node'] = random.randint(0,10000000) 
+ 
 #init_data_sys_ = jdata['init_data_sys']
 init_data_sys = []
 #for ii in init_data_sys_ :
