@@ -6,8 +6,10 @@ from e3_layers.data import Batch
 from glob import glob 
 """
 generate hdf5 files for e3_layers from deepmd format
+set the dir place as you like
 """
-dirs = glob('./*/*/set.000')
+
+dirs = glob('/root/data.all/*/*/02.fp/data.*/set.000')
 
 def dumpdata(dir0):
     #data = h5py.File(dir0,'r')
@@ -42,6 +44,8 @@ def dumpdata(dir0):
 pwd = os.getcwd()
 for i in range(len(dirs)):
     os.chdir(dirs[i][:-7])
+    f_name = os.path.basename(dirs[i])
+    os.system('rm '+str(f_name))
     dir0 = os.path.basename(dirs[i])
     dumpdata(dir0)
     os.chdir(pwd)
