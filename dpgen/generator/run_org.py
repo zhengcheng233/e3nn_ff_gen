@@ -82,7 +82,7 @@ def copy_model(numb_model, prv_iter_index, cur_iter_index, generalML) :
         prv_train_task = os.path.join(prv_train_path, train_task_fmt%ii)
         os.chdir(cur_train_path)
         os.symlink(os.path.relpath(prv_train_task), train_task_fmt%ii)
-        os.symlink(os.path.join(train_task_fmt%ii, 'results', 'default', 'best.pt'),'best.%03d.pt' % ii) 
+        os.symlink(os.path.join(train_task_fmt%ii, 'results', 'default_project', 'default', 'best.pt'),'best.%03d.pt' % ii) 
         os.chdir(cwd)
         if generalML == True and ii == 0:
             task_general_file = os.path.join('./generalpb','general_graph.00'+str(ii)+'.pb')
@@ -298,7 +298,7 @@ def make_train(iter_index,jdata,mdata):
         with open(os.path.join(task_path, train_input_file), 'w') as outfile:
             json.dump(jinput, outfile, indent = 4)
 
-    # link old models link nequip models (here, I use the trainer.pt) 
+    # link old models link nequip models (here, I use the best.pt) 
     if iter_index > 0 :
         prev_iter_name = make_iter_name(iter_index-1)
         prev_work_path = os.path.join(prev_iter_name, train_name)
@@ -376,17 +376,19 @@ def run_train(iter_index,
         n_train += h5py.File(os.path.join(ii, 'fp.hdf5'),'r')['_n_nodes'].shape[0]
     os.chdir(cwd)
     n_train = int(n_train)
+    n_val = max(int(0.01 * n_train),64)
+    n_train = n_train - n_val
     #config_spec = "{\'data_confi.n_train\':%s, \'data_config.n_val\': 0, \'data.config.path\':\'../data.all/:.fp.hdf5\'}" %(n_train)
     # may define the learning rate
     if n_train > 50000:
-        epoch_sub = 5
+        epoch_sub = 2 
     else:
         epoch_sub = 1
     if LooseVersion(mdata["deepmd_version"]) >= LooseVersion('1') and LooseVersion(mdata["deepmd_version"]) < LooseVersion('3'):
         if training_init_model:
-            command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':64,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.001,'metric_key':'training_loss','early_stopping_patiences':{'training_loss':20}}\" --resume_from old/results/default/last.pt" %(train_command, n_train-64, max(int(n_train/10000),1),epoch_sub)
+            command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':%s,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.002,'metric_key':'validation_loss','early_stopping_patiences':{'training_loss':20}}\" --resume_from old/results/default_project/default/last.pt" %(train_command, n_train, n_val, max(int(n_train/10000),1),epoch_sub)
         else:
-            command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':64,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.01,'metric_key':'training_loss','early_stopping_patiences':{'training_loss':20}}\"" %(train_command, n_train-64, max(int(n_train/10000),1),epoch_sub)
+            command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':%s,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.01,'metric_key':'validation_loss','early_stopping_patiences':{'training_loss':20}}\"" %(train_command, n_train, n_val, max(int(n_train/10000),1),epoch_sub)
         commands.append(command)
     else:
         raise RuntimeError("DP-GEN currently only supports for DeePMD-kit 1.x or 2.x version!" )
@@ -394,9 +396,9 @@ def run_train(iter_index,
     run_tasks = [os.path.basename(ii) for ii in all_tasks]
     forward_files = ['train.py']
     if training_init_model:
-        forward_files += [os.path.join('old','results', 'default', 'trainer.pt')]
-        forward_files += [os.path.join('old','results', 'default', 'last.pt')]
-        forward_files += [os.path.join('old','results', 'default', 'best.pt')]
+        forward_files += [os.path.join('old','results', 'default_project', 'default', 'trainer.pt')]
+        forward_files += [os.path.join('old','results', 'default_project', 'default', 'last.pt')]
+        forward_files += [os.path.join('old','results', 'default_project', 'default', 'best.pt')]
     backward_files = ['results']
 
     try:
@@ -459,7 +461,7 @@ def post_train (iter_index,
         if not jdata.get("nequip", False):
             model_name = 'frozen_model.pb'
         else:
-            model_name = 'results/default/best.pt'
+            model_name = 'results/default_project/default/best.pt'
         task_file = os.path.join(train_task_fmt % ii, model_name)
         if not jdata.get("nequip",False):
             ofile = os.path.join(work_path, 'graph.%03d.pb' % ii)
@@ -1125,6 +1127,9 @@ def _make_fp_vasp_inner (modd_path,
             sys_lim = lim
         return sys_lim
 
+    fp_task_max_acc_conv = int(len(jdata['all_sys_idx'])/len(jdata['model_devi_jobs'][-1]['sys_idx'])*jdata['fp_task_max'])
+    fp_task_max_acc_conv = min(fp_task_max_acc_conv, jdata['fp_task_max_hi'])
+
     for ss in system_index:
         modd_system_glob = os.path.join(modd_path, 'task.' + ss + '.*')
         modd_system_task = glob.glob(modd_system_glob)
@@ -1174,8 +1179,14 @@ def _make_fp_vasp_inner (modd_path,
                 prev_static = np.loadtxt(prev_static_path)
                 patience_num = int(prev_static[-1])
                 largermse_num = int(prev_static[-2])
-                rmse_f = np.load(os.path.join(prev_path,'data.'+ss))['rmse_f']
-                if rmse_f > jdata['rmse_f_cri']:
+                # define the largermse_num, if rmse_f < rmse_f_cri_hi and conf_idx < 0.05 * conf_all
+                if os.path.isfile(os.path.abspath('data.'+ss+'static.npz')):
+                    rmse_f = np.load(os.path.join(prev_path,'data.'+ss,'static.npz'))['rmse_f']
+                    if rmse_f < jdata['rmse_f_cri_hi']:
+                        largermse_num += 1
+                    else:
+                        largermse_num = 0
+                else:
                     largermse_num += 1
             else:
                 patience_num = 0
@@ -1190,9 +1201,12 @@ def _make_fp_vasp_inner (modd_path,
         else:
             patience_num = 0
         
+        # if conf_idx > 0.05 * conf_all or new temperature; largerrmse_num = 0
         if len(jdata["model_devi_jobs"]) > 1 and jdata["model_devi_jobs"][-2]["temps"][-1] < jdata["model_devi_jobs"][-1]["temps"][-1]:
             largermse_num = 0
-
+        if len(jdata['model_devi_jobs'][-1]['sys_idx'])/len(jdata['all_sys_idx']) > 1 -  jdata["fp_accurate_soft_threshold"]:
+            largermse_num = 0
+        
         np.savetxt(os.path.join(work_path,'static.'+ss),[len(fp_rest_accurate)/fp_sum,len(fp_candidate)/fp_sum,len(fp_rest_failed)/fp_sum,largermse_num,patience_num])
         for cc_key, cc_value in counter.items():
             dlog.info("system {0:s} {1:9s} : {2:6d} in {3:6d} {4:6.2f} %".format(ss, cc_key, cc_value, fp_sum, cc_value/fp_sum*100))
@@ -1212,9 +1226,12 @@ def _make_fp_vasp_inner (modd_path,
         # set number of tasks
         accurate_ratio = float(counter['accurate']) / float(fp_sum)
         if accurate_ratio < fp_accurate_soft_threshold :
-            this_fp_task_max = fp_task_max
+            this_fp_task_max = max(fp_task_max, fp_task_max_acc_conv)
         elif accurate_ratio >= fp_accurate_soft_threshold and accurate_ratio < fp_accurate_threshold:
             this_fp_task_max = int(fp_task_max * (accurate_ratio - fp_accurate_threshold) / (fp_accurate_soft_threshold - fp_accurate_threshold))
+            # if most of the configs are converged, enlarge the fp_tasks of rest configs 
+            if this_fp_task_max > 0:
+                this_fp_task_max = int(fp_task_max_acc_conv * (accurate_ratio - fp_accurate_threshold) / (fp_accurate_soft_threshold - fp_accurate_threshold))
         else:
             this_fp_task_max = 0
         numb_task = min(this_fp_task_max, len(fp_candidate))
@@ -1588,7 +1605,7 @@ def _single_sys_adjusted(f_trust_lo,f_trust_hi,ii,generalML,jdata):
     conv = False
     if static_ratio[0] > conver_cri or this_fp_task_max == 0:
         conv = True
-    elif static_ratio[-2] >= jdata['model_devi_patience']*7 and rnse_f_static < rmse_f_cri_hi and np.max(model_max_f) < max_f_cri_hi:
+    elif static_ratio[-2] > jdata['model_devi_patience'] and np.max(model_max_f) < max_f_cri_hi:
         conv = True
     # adjust the trust_lo, trust_hi; need reload previous model_max_f and model_devi_f; maybe save as a file
     if generalML == True:
