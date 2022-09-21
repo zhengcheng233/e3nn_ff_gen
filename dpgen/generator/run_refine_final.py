@@ -334,18 +334,12 @@ def make_train(iter_index,jdata,mdata):
                 os.path.join(prev_task_path, "results"))
             _link_old_models(work_path, old_model_files, ii)
     else:
-        # don't change as I will not use this function
-        if type(training_iter0_model) == str:
-            training_iter0_model = [training_iter0_model]
-        iter0_models = []
-        for ii in training_iter0_model:
-            model_is = glob.glob(ii)
-            model_is.sort()
-            iter0_models += [os.path.abspath(ii) for ii in model_is]
-        if training_init_model:
-            assert(numb_models == len(iter0_models)), "training_iter0_model should be provided, and the number of models should be equal to %d" % numb_models
-        for ii in range(len(iter0_models)):
-            old_model_files = glob.glob(os.path.join(iter0_models[ii], 'results'))
+        prev_iter_name = make_iter_name(iter_index)
+        prev_work_path = os.path.join(prev_iter_name, train_name + '.bk000')
+        for ii in range(numb_models):
+            prev_task_path = os.path.join(prev_work_path, train_task_fmt%ii)
+            old_model_files = glob.glob(
+                os.path.join(prev_task_path, 'results'))
             _link_old_models(work_path, old_model_files, ii)
     # Copy user defined forward files
     symlink_user_forward_files(mdata=mdata, task_type="train", work_path=work_path)
@@ -422,10 +416,10 @@ def run_train(iter_index,
     run_tasks = [os.path.basename(ii) for ii in all_tasks]
     forward_files = ['train.py']
     #if training_init_model:
-    if iter_index > 0:
-        forward_files += [os.path.join('old','results', 'default_project', 'default', 'trainer.pt')]
-        forward_files += [os.path.join('old','results', 'default_project', 'default', 'last.pt')]
-        forward_files += [os.path.join('old','results', 'default_project', 'default', 'best.pt')]
+    #if iter_index > 0:
+    forward_files += [os.path.join('old','results', 'default_project', 'default', 'trainer.pt')]
+    forward_files += [os.path.join('old','results', 'default_project', 'default', 'last.pt')]
+    forward_files += [os.path.join('old','results', 'default_project', 'default', 'best.pt')]
     backward_files = ['results']
 
     try:
@@ -1015,7 +1009,7 @@ def post_model_devi (iter_index,
        mpreddata = mdata['train_resources']
        mpreddata['source_list'] = ['/root/e3_layer.sh']
        mpreddata['number_node'] = mpreddata['number_node'] - 49
-       mpreddata['group_size'] = 4 #mdata['model_devi_resources']['group_size'] 
+       mpreddata['group_size'] = 10 #mdata['model_devi_resources']['group_size'] 
        if LooseVersion(api_version) < LooseVersion('1.0'):
           warnings.warn(f"the dpdispatcher will be updated to new version."
             f"And the interface may be changed. Please check the documents for more details")
@@ -1440,7 +1434,12 @@ def _make_fp_vasp_inner (modd_path,
         total_fp_max += numb_task
         # !!! avoid too early stop md explore
         if len(fp_rest_failed) > 0:
-            patience_num = 0; largermse_num = 0
+            patience_num = 0
+            # !!! avoid always generate unreasonable structures due to the topo is imagined
+            if jdata['model_devi_jobs'][-1]['sys_idx']/jdata['all_sys_idx'] < 1 - jdata["fp_accurate_soft_threshold"]:
+                pass
+            else:
+                largermse_num = 0
         
         np.savetxt(os.path.join(work_path,'static.'+ss),[len(fp_rest_accurate)/fp_sum,len(fp_candidate)/fp_sum,len(fp_rest_failed)/fp_sum,largermse_num,patience_num])
         
@@ -1907,10 +1906,10 @@ def set_version(mdata):
     return mdata
 
 
-#def _single_sys_adjusted(f_trust_lo,f_trust_hi,ii,generalML,conver_cri,max_f_cri,rmse_f_cri):
 def _single_sys_adjusted(f_trust_lo,f_trust_hi,ii,generalML,jdata):
-    # if generalML == False; also need to adjust trust_hi
-    # !!! we may also static correlation of model_devi and model_err and give warning
+    # !!!!!! this function is important, it is used to adjust the trust_lo and turst_hi dynamically during the md explore 
+    # !!!!!! with the combination of topo.py, we can chose the reasonable but rarely sampled configurations 
+
     conver_cri = jdata['fp_accurate_threshold']; max_f_cri = jdata['max_f_cri']
     rmse_f_cri = jdata['rmse_f_cri']; fp_task_max = jdata['fp_task_max']
     rmse_f_cri_hi = jdata['rmse_f_cri_hi']; max_f_cri_hi = jdata['max_f_cri_hi']
@@ -1929,14 +1928,24 @@ def _single_sys_adjusted(f_trust_lo,f_trust_hi,ii,generalML,jdata):
         conv = True
     elif static_ratio[-2] > jdata['model_devi_patience'] -1 and np.max(model_max_f) < max_f_cri_hi:
         conv = True
+    
     # adjust the trust_lo, trust_hi; need reload previous model_max_f and model_devi_f; maybe save as a file
-    if generalML == True:
-        f_trust_hi = 100.
-    else:
-        pass
+    #if generalML == True:
+    #    f_trust_hi = 100.
+    #else:
+    #    pass
 
     n_cand = np.where(model_rmse_f > rmse_f_cri)[0]
-    # first adjust if trust_lo is too high
+
+    adjust_hi = False
+    if np.max(model_devi_f) > f_trust_hi: 
+        adjust_hi = True
+        n_unreason = len(np.where(model_devi_single > f_trust_hi)[0])
+        f_unreason = sorted(model_max_f)[-n_unreason]
+    else:
+        if np.max(model_max_f) > max_f_cri * 2.:
+            f_trust_hi = np.max(model_devi_f)
+
     if static_ratio[0] > 4*conver_cri - 3 or this_fp_task_max < 4:
         if rmse_f_static > rmse_f_cri / (min((4*conver_cri - 3), static_ratio[0])):
             f_trust_lo = f_trust_lo * ((rmse_f_cri / rmse_f_static)**0.5)
@@ -1947,6 +1956,14 @@ def _single_sys_adjusted(f_trust_lo,f_trust_hi,ii,generalML,jdata):
         elif len(n_cand)/len(model_rmse_f) < 0.4:
             #n_acc = max(0,len(model_devi_f)-len(n_cand)*2)
             f_trust_lo = sorted(model_devi_f)[0]
+        # adjust if the trust_hi is too high
+        if adjust_hi == True:
+            if rmse_f_static < rmse_f_cri:
+                f_trust_hi = 1.05 * f_trust_hi
+            elif rmsf_f_static > rmse_f_cri_h:
+                f_trust_hi = 0.95 * f_trust_hi
+            elif f_unreason > max_f_cri * 2.:
+                f_trust_hi = 0.95 * f_trust_hi
     else:
         if len(n_cand)/len(model_rmse_f) < 0.4 and rmse_f_static < rmse_f_cri:
             f_acc = []
@@ -1959,7 +1976,12 @@ def _single_sys_adjusted(f_trust_lo,f_trust_hi,ii,generalML,jdata):
             if np.max(f_acc) < max_f_cri:
                 n_acc = int(max(0,len(model_devi_f) - len(n_cand)*2.5 - 2))
                 f_trust_lo = sorted(model_devi_f)[n_acc]
-    
+        # adjust if the trust_hi is too high
+        if adjust_hi == True:
+            if rmse_f_static < rmse_f_cri:
+                f_trust_hi = 1.05 * f_trust_hi
+            elif f_unreason > max_f_cri * 2.:
+                f_trust_hi = 0.95 * f_trust_hi
     return conv,f_trust_lo,f_trust_hi
 
 def model_devi_vs_err_adjust(jdata):
