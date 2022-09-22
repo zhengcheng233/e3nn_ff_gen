@@ -1436,7 +1436,7 @@ def _make_fp_vasp_inner (modd_path,
         if len(fp_rest_failed) > 0:
             patience_num = 0
             # !!! avoid always generate unreasonable structures due to the topo is imagined
-            if jdata['model_devi_jobs'][-1]['sys_idx']/jdata['all_sys_idx'] < 1 - jdata["fp_accurate_soft_threshold"]:
+            if len(jdata['model_devi_jobs'][-1]['sys_idx'])/len(jdata['all_sys_idx']) < 1 - jdata["fp_accurate_soft_threshold"]:
                 pass
             else:
                 largermse_num = 0
@@ -2031,7 +2031,10 @@ def model_devi_vs_err_adjust(jdata):
         
         #conv,f_trust_lo_sys,f_trust_hi_sys = _single_sys_adjusted(f_trust_lo_sys,f_trust_hi_sys,ii,generalML,jdata['fp_accurate_threshold'],jdata['max_f_cri'],jdata['rmse_f_cri'])
         jdata["model_devi_f_trust_lo"][ii] = f_trust_lo_sys
-        jdata["model_devi_f_trust_hi"][ii] = f_trust_hi_sys
+        if f_trust_hi_sys > 9.:
+            jdata["model_devi_f_trust_hi"][ii] = f_trust_lo_sys * 3.
+        else:
+            jdata["model_devi_f_trust_hi"][ii] = f_trust_hi_sys
         #jdata["model_devi_numb_candi_f"] = max(int(j_last_devi['nsteps']/j_last_devi['trj_freq']*jdata['fp_accurate_soft_threshold']+1), jdata['fp_task_max']*5)
         if conv == False:
             new_simul = False
