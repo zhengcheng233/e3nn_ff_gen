@@ -400,7 +400,7 @@ def run_train(iter_index,
     n_train = n_train - n_val
     #config_spec = "{\'data_confi.n_train\':%s, \'data_config.n_val\': 0, \'data.config.path\':\'../data.all/:.fp.hdf5\'}" %(n_train)
     # may define the learning rate
-    if n_train > 50000:
+    if n_train > 77500:
         epoch_sub = 2 
     else:
         epoch_sub = 1
@@ -408,7 +408,8 @@ def run_train(iter_index,
         if training_init_model:
             command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':%s,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.003,'metric_key':'validation_loss','early_stopping_patiences':{'training_loss':20}}\" --resume_from old/results/default_project/default/last.pt" %(train_command, n_train, n_val, max(int(n_train/10000),1),epoch_sub)
         else:
-            command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':%s,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.005,'metric_key':'validation_loss','early_stopping_patiences':{'training_loss':20}}\" --resume_from old/results/default_project/default/last.pt" %(train_command, n_train, n_val, max(int(n_train/10000),1),epoch_sub)
+            command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':%s,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.01,'metric_key':'validation_loss','early_stopping_patiences':{'training_loss':20}}\"" %(train_command, n_train, n_val, max(int(n_train/10000),1),epoch_sub)
+            #command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':%s,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.01,'metric_key':'validation_loss','early_stopping_patiences':{'training_loss':20}}\" --resume_from old/results/default_project/default/last.pt" %(train_command, n_train, n_val, max(int(n_train/10000),1),epoch_sub)
         commands.append(command)
     else:
         raise RuntimeError("DP-GEN currently only supports for DeePMD-kit 1.x or 2.x version!" )
@@ -915,9 +916,10 @@ def copy_model_devi (iter_index,
     run_tasks = [os.path.basename(ii) for ii in run_tasks_]
 
     for task in run_tasks:
+        os.system('rm -rf '+ os.path.join(work_path, task, 'traj'))
         os.symlink(os.path.join(prev_work_path, task, 'traj'), os.path.join(work_path, task, 'traj'))
     
-    command = "python3 e3_layer_md.py %s %s %s %s %s" %(cur_job['temps'][-1],cur_job['nsteps']+cur_job['trj_freq'], cur_job['trj_freq'],jdata['bond_hi'],jdata['bond_lo'], str(1))
+    command = "python3 e3_layer_md.py %s %s %s %s %s %s" %(cur_job['temps'][-1],cur_job['nsteps']+cur_job['trj_freq'], cur_job['trj_freq'],jdata['bond_hi'],jdata['bond_lo'], str(1))
     command = "/bin/sh -c '%s'" % command
     commands = [command]
     forward_files = ['conf.lmp', 'e3_layer_md.py', 'traj', 'topy.py', 'inference.py']
@@ -1359,7 +1361,10 @@ def _make_fp_vasp_inner (modd_path,
                         fp_hist_idx = []
                 else:
                     fp_hist_idx = []
-                fp_hist_idx_all.append([int(idx) for idx in fp_hist_idx])
+                if len(fp_hist_idx.shape) > 0: 
+                    fp_hist_idx_all.append([int(idx) for idx in fp_hist_idx])
+                else:
+                    fp_hist_idx_all.append([int(fp_hist_idx)])
             else:
                 fp_hist_idx_all.append([])
 
@@ -1940,7 +1945,7 @@ def _single_sys_adjusted(f_trust_lo,f_trust_hi,ii,generalML,jdata):
     adjust_hi = False
     if np.max(model_devi_f) > f_trust_hi: 
         adjust_hi = True
-        n_unreason = len(np.where(model_devi_single > f_trust_hi)[0])
+        n_unreason = len(np.where(model_devi_f > f_trust_hi)[0])
         f_unreason = sorted(model_max_f)[-n_unreason]
     else:
         if np.max(model_max_f) > max_f_cri * 2.:
@@ -2161,6 +2166,8 @@ def run_iter(param_file,machine_file):
                         do_md = True
                 else:
                     do_md = True
+                # !!!!! need modify later, now has no time to debug
+                do_md = True
                 log_iter ("run_model_devi", ii, jj)
                 if do_md == True:
                     run_model_devi (ii, jdata, mdata)
