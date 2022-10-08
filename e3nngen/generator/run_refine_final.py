@@ -6,6 +6,7 @@ iter:
         01.model_devi
         02.fp
         03.data
+!!!!! model_devi_numb_candi_f/all_conform must < = 95 %
 """
 
 import h5py
@@ -47,6 +48,9 @@ from dpgen.dispatcher.Dispatcher import Dispatcher, _split_tasks, make_dispatche
 from dpgen.util import sepline
 from dpgen import ROOT_PATH
 from dpgen.generator import run
+from e3_layers.data import Batch
+import ase
+
 
 template_name = 'template'
 train_name = '00.train'
@@ -66,12 +70,12 @@ make_model_devi_task_name = run.make_model_devi_task_name; make_model_devi_conf_
 make_fp_task_name = run.make_fp_task_name; poscar_natoms = run.poscar_natoms
 poscar_shuffle = run.poscar_shuffle; expand_idx = run.expand_idx
 parse_cur_job = run.parse_cur_job; dump_to_poscar = run.dump_to_poscar 
-dump_to_deepmd_raw = run.dump_to_deepmd_raw; run_fp_inner = run.run_fp_inner
-_gaussian_check_fin = run._gaussian_check_fin; _check_skip_train = run._check_skip_train
-_check_empty_iter = run._check_empty_iter; detect_batch_size = run.detect_batch_size
+dump_to_deepmd_raw = run.dump_to_deepmd_raw; _gaussian_check_fin = run._gaussian_check_fin
+_check_skip_train = run._check_skip_train; _check_empty_iter = run._check_empty_iter
+detect_batch_size = run.detect_batch_size
 
 
-def copy_model(numb_model, prv_iter_index, cur_iter_index, generalML) :
+def copy_model(numb_model, prv_iter_index, cur_iter_index, generalML, nequip_md, xtb_md) :
     cwd = os.getcwd()
     prv_train_path = os.path.join(make_iter_name(prv_iter_index), train_name)
     cur_train_path = os.path.join(make_iter_name(cur_iter_index), train_name)
@@ -82,13 +86,21 @@ def copy_model(numb_model, prv_iter_index, cur_iter_index, generalML) :
         prv_train_task = os.path.join(prv_train_path, train_task_fmt%ii)
         os.chdir(cur_train_path)
         os.symlink(os.path.relpath(prv_train_task), train_task_fmt%ii)
-        os.symlink(os.path.join(train_task_fmt%ii, 'results', 'default', 'best.pt'),'best.%03d.pt' % ii) 
+        os.symlink(os.path.join(train_task_fmt%ii, 'results', 'default_project', 'default', 'best.pt'),'best.%03d.pt' % ii) 
         os.chdir(cwd)
         if generalML == True and ii == 0:
-            task_general_file = os.path.join('./generalpb','general_graph.00'+str(ii)+'.pb')
-            task_general_file = os.path.abspath(task_general_file)
-            general_ofile = os.path.join(cur_train_path, 'general_graph.%03d.pb' % ii)
-            os.symlink(task_general_file, general_ofile)
+            if nequip_md == True:
+                task_general_file = os.path.join('./generalpb','general_graph.00'+str(ii)+'.pt')
+                task_general_file = os.path.abspath(task_general_file)
+                general_ofile = os.path.join(cur_train_path, 'general_graph.%03d.pt' %ii)
+                os.symlink(task_general_file, general_ofile)
+            elif xtb_md == True:
+                general_ofile = []
+            else:
+                task_general_file = os.path.join('./generalpb','general_graph.00'+str(ii)+'.pb')
+                task_general_file = os.path.abspath(task_general_file)
+                general_ofile = os.path.join(cur_train_path, 'general_graph.%03d.pb' % ii)
+                os.symlink(task_general_file, general_ofile)
     with open(os.path.join(cur_train_path, "copied"), 'w') as fp:
         None
 
@@ -130,11 +142,20 @@ def calc_model_devi_f(fs: np.ndarray):
     avg_devi_f = np.mean(fs_devi, axis=-1)
     return max_devi_f, min_devi_f, avg_devi_f
 
-def calc_model_devi(f0,f1,f2,f3,f_name,frequency):
+def calc_model_devi(f0,f1,f2,f3,f_name,frequency,reasons):
     forces = [f0,f1,f2,f3]; forces = np.array(forces)
     devi = [np.arange(f0.shape[0]) * frequency]
     devi0 = calc_model_devi_f(forces)
     devi += devi0; devi += devi0; devi = np.vstack(devi).T
+    # set unreasonable structures model_devi as very large value
+    unreason = False
+    for idx,reason in enumerate(reasons):
+        if reason[0] == 0 and reason[1] == 0:
+            unreason = True
+        elif reason[0] == 0 and reason[1] == 1:
+            devi[idx][1:] = 1000.
+        if unreason == True:
+            devi[idx][1:] = 1000.
     write_model_devi_out(devi,f_name)
     return 
 
@@ -147,7 +168,12 @@ def process_model_devi(all_tasks,freq,f_name):
         n_frame = h5py.File('traj.hdf5','r')['energy'].shape[0]; n_atoms = f0.shape[0]
         f0 = f0.reshape((n_frame,int(n_atoms/n_frame),3)); f1 = f1.reshape((n_frame,int(n_atoms/n_frame),3))
         f2 = f2.reshape((n_frame,int(n_atoms/n_frame),3)); f3 = f3.reshape((n_frame,int(n_atoms/n_frame),3))
-        calc_model_devi(f0,f1,f2,f3,f_name,freq)
+        reasons = []
+        with open('reasonable.txt','r') as fp:
+            for line in fp:
+                line = line.strip().split()
+                reasons.append([int(line[0]),int(line[1])])
+        calc_model_devi(f0,f1,f2,f3,f_name,freq,reasons)
         os.chdir(cwd)
 
 def make_train(iter_index,jdata,mdata):
@@ -169,6 +195,8 @@ def make_train(iter_index,jdata,mdata):
     else:
         training_reuse_stop_batch = 400000
 
+    nequip_md = jdata.get('nequip_md',True)
+    xtb_md = jdata.get('xtb_md',True)
     training_reuse_start_lr = jdata.get('training_reuse_start_lr', 1e-4)
     training_reuse_start_pref_e = jdata.get('training_reuse_start_pref_e', 0.1)
     training_reuse_start_pref_f = jdata.get('training_reuse_start_pref_f', 100)
@@ -177,11 +205,11 @@ def make_train(iter_index,jdata,mdata):
     generalML = jdata.get('generalML',True)
     if iter_index > 0 and _check_empty_iter(iter_index-1, fp_task_min) :
         log_task('prev data is empty, copy prev model')
-        copy_model(numb_models, iter_index-1, iter_index, generalML)
+        copy_model(numb_models, iter_index-1, iter_index, generalML, nequip_md, xtb_md)
         return
     elif iter_index > 0 and _check_skip_train(model_devi_jobs[iter_index-1]):
         log_task('skip training at step %d ' % (iter_index-1))
-        copy_model(numb_models, iter_index-1, iter_index, generalML)
+        copy_model(numb_models, iter_index-1, iter_index, generalML, nequip_md, xtb_md)
         return
     else :
         iter_name = make_iter_name(iter_index)
@@ -243,12 +271,13 @@ def make_train(iter_index,jdata,mdata):
             for jj in fp_data_sys :
                 sys_idx = int(jj.split('.')[-1])
 
-                nframes = dpdata.System(jj,'deepmd/npy').get_nframes()
+                #nframes = dpdata.System(jj,'deepmd/npy').get_nframes()
+                nframes = 10
                 if nframes < fp_task_min:
                     log_task('nframes (%d) in data sys %s is too small, skip' % (nframes, jj))
                     continue
                 init_data_sys.append(os.path.join('..','data.all','data.iters',jj))
-                init_batch_size.append(detect_batch_size(sys_batch_size[sys_idx],jj))
+                #init_batch_size.append(detect_batch_size(sys_batch_size[sys_idx],jj))
 
     # here, only supprot trainig prarm for hangrui 
     jinput = jdata['default_training_param']
@@ -298,7 +327,7 @@ def make_train(iter_index,jdata,mdata):
         with open(os.path.join(task_path, train_input_file), 'w') as outfile:
             json.dump(jinput, outfile, indent = 4)
 
-    # link old models link nequip models (here, I use the trainer.pt) 
+    # link old models link nequip models (here, I use the best.pt) 
     if iter_index > 0 :
         prev_iter_name = make_iter_name(iter_index-1)
         prev_work_path = os.path.join(prev_iter_name, train_name)
@@ -308,18 +337,12 @@ def make_train(iter_index,jdata,mdata):
                 os.path.join(prev_task_path, "results"))
             _link_old_models(work_path, old_model_files, ii)
     else:
-        # don't change as I will not use this function
-        if type(training_iter0_model) == str:
-            training_iter0_model = [training_iter0_model]
-        iter0_models = []
-        for ii in training_iter0_model:
-            model_is = glob.glob(ii)
-            model_is.sort()
-            iter0_models += [os.path.abspath(ii) for ii in model_is]
-        if training_init_model:
-            assert(numb_models == len(iter0_models)), "training_iter0_model should be provided, and the number of models should be equal to %d" % numb_models
-        for ii in range(len(iter0_models)):
-            old_model_files = glob.glob(os.path.join(iter0_models[ii], 'results'))
+        prev_iter_name = make_iter_name(iter_index)
+        prev_work_path = os.path.join(prev_iter_name, train_name + '.bk000')
+        for ii in range(numb_models):
+            prev_task_path = os.path.join(prev_work_path, train_task_fmt%ii)
+            old_model_files = glob.glob(
+                os.path.join(prev_task_path, 'results'))
             _link_old_models(work_path, old_model_files, ii)
     # Copy user defined forward files
     symlink_user_forward_files(mdata=mdata, task_type="train", work_path=work_path)
@@ -376,33 +399,40 @@ def run_train(iter_index,
         n_train += h5py.File(os.path.join(ii, 'fp.hdf5'),'r')['_n_nodes'].shape[0]
     os.chdir(cwd)
     n_train = int(n_train)
+    n_val = max(int(0.01 * n_train),64)
+    n_train = n_train - n_val
     #config_spec = "{\'data_confi.n_train\':%s, \'data_config.n_val\': 0, \'data.config.path\':\'../data.all/:.fp.hdf5\'}" %(n_train)
     # may define the learning rate
-    if n_train > 50000:
-        epoch_sub = 5
+    if n_train > 77500:
+        epoch_sub = 2 
     else:
         epoch_sub = 1
     if LooseVersion(mdata["deepmd_version"]) >= LooseVersion('1') and LooseVersion(mdata["deepmd_version"]) < LooseVersion('3'):
         if training_init_model:
-            command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':64,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.001,'metric_key':'training_loss','early_stopping_patiences':{'training_loss':20}}\" --resume_from old/results/default/last.pt" %(train_command, n_train-64, max(int(n_train/10000),1),epoch_sub)
+            command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':%s,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.005,'metric_key':'validation_loss','early_stopping_patiences':{'training_loss':20}}\" --resume_from old/results/default_project/default/last.pt" %(train_command, n_train, n_val, max(int(n_train/10000),1),epoch_sub)
         else:
-            command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':64,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.01,'metric_key':'training_loss','early_stopping_patiences':{'training_loss':20}}\"" %(train_command, n_train-64, max(int(n_train/10000),1),epoch_sub)
+            #command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':%s,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.01,'metric_key':'validation_loss','early_stopping_patiences':{'training_loss':20}}\"" %(train_command, n_train, n_val, max(int(n_train/10000),1),epoch_sub)
+            command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':%s,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.006,'metric_key':'validation_loss','early_stopping_patiences':{'training_loss':20}}\" --resume_from old/results/default_project/default/last.pt" %(train_command, n_train, n_val, max(int(n_train/10000),1),epoch_sub)
         commands.append(command)
     else:
         raise RuntimeError("DP-GEN currently only supports for DeePMD-kit 1.x or 2.x version!" )
 
     run_tasks = [os.path.basename(ii) for ii in all_tasks]
     forward_files = ['train.py']
-    if training_init_model:
-        forward_files += [os.path.join('old','results', 'default', 'trainer.pt')]
-        forward_files += [os.path.join('old','results', 'default', 'last.pt')]
-        forward_files += [os.path.join('old','results', 'default', 'best.pt')]
+    #if training_init_model:
+    #if iter_index > 0:
+    forward_files += [os.path.join('old','results', 'default_project', 'default', 'trainer.pt')]
+    forward_files += [os.path.join('old','results', 'default_project', 'default', 'last.pt')]
+    forward_files += [os.path.join('old','results', 'default_project', 'default', 'best.pt')]
     backward_files = ['results']
 
     try:
-        train_group_size = mdata['train_group_size']
+        train_group_size = 1
+        mdata['train_resources']['group_size'] = 1
+        #train_group_size = mdata['train_group_size']
     except:
         train_group_size = 1
+        mdata['train_resources']['group_size'] = 1
 
     api_version = mdata.get('api_version', '0.9')
 
@@ -446,6 +476,8 @@ def post_train (iter_index,
         # load json param
     generalML = jdata.get('generalML',True)
     numb_models = jdata['numb_models']
+    nequip_md = jdata.get('nequip_md',True)
+    xtb_md = jdata.get('xtb_md',True)
     # paths
     iter_name = make_iter_name(iter_index)
     work_path = os.path.join(iter_name, train_name)
@@ -459,7 +491,7 @@ def post_train (iter_index,
         if not jdata.get("nequip", False):
             model_name = 'frozen_model.pb'
         else:
-            model_name = 'results/default/best.pt'
+            model_name = 'results/default_project/default/best.pt'
         task_file = os.path.join(train_task_fmt % ii, model_name)
         if not jdata.get("nequip",False):
             ofile = os.path.join(work_path, 'graph.%03d.pb' % ii)
@@ -469,10 +501,18 @@ def post_train (iter_index,
             os.remove(ofile)
         os.symlink(task_file, ofile)
         if generalML == True and ii == 0:
-            task_general_file = os.path.join('./generalpb','general_graph.00'+str(ii)+'.pb')
-            task_general_file = os.path.abspath(task_general_file)
-            general_ofile = os.path.join(work_path,'general_graph.%03d.pb' % ii)
-            os.symlink(task_general_file,general_ofile)
+            if nequip_md == True:
+                task_general_file = os.path.join('./generalpt','general_graph.00'+str(ii)+'.pt')
+                task_general_file = os.path.abspath(task_general_file)
+                general_ofile = os.path.join(work_path,'general_graph.%03d.pt' % ii)
+                os.symlink(task_general_file,general_ofile)
+            elif xtb_md == True:
+                pass
+            else:
+                task_general_file = os.path.join('./generalpb','general_graph.00'+str(ii)+'.pb')
+                task_general_file = os.path.abspath(task_general_file)
+                general_ofile = os.path.join(work_path,'general_graph.%03d.pb' % ii)
+                os.symlink(task_general_file,general_ofile)
 
 
 def make_model_devi(iter_index,
@@ -482,17 +522,20 @@ def make_model_devi(iter_index,
     model_devi_engine = jdata.get('model_devi_engine', 'lammps')
     model_devi_jobs = jdata['model_devi_jobs']
     generalML = jdata.get('generalML',True)
+    nequip_md = jdata.get('nequip_md',True)
+    xtb_md = jdata.get('xtb_md',True)
     if (iter_index >= len(model_devi_jobs)) :
         return False
     cur_job = model_devi_jobs[iter_index]
     if "sys_configs_prefix" in jdata:
-        sys_configs = []
+        sys_configs = [] 
         for sys_list in jdata["sys_configs"]:
             #assert (isinstance(sys_list, list) ), "Currently only support type list for sys in 'sys_conifgs' "
             temp_sys_list = [os.path.join(jdata["sys_configs_prefix"], sys) for sys in sys_list]
             sys_configs.append(temp_sys_list)
     else:
         sys_configs = jdata['sys_configs']
+
     # whether using orgin configs
     shuffle_poscar = jdata['shuffle_poscar']
 
@@ -500,15 +543,19 @@ def make_model_devi(iter_index,
     if (len(sys_idx) != len(list(set(sys_idx)))) :
         raise RuntimeError("system index should be uniq")
     
-    conf_systems = []
+    # add cur_dir as the directory of topo.txt and atompair_length.txt
+    conf_systems = []; conf_dirs = []
     for idx in sys_idx : 
-        cur_systems = []
+        cur_systems = []; cur_dir = []
         ss = sys_configs[idx]
         for ii in ss :
             cur_systems += glob.glob(ii)
         cur_systems.sort()
         cur_systems = [os.path.abspath(ii) for ii in cur_systems]
-        conf_systems.append (cur_systems)
+        for ii in cur_systems:
+            f_name = os.path.basename(ii)
+            cur_dir.append(ii[:-len(f_name)])
+        conf_systems.append (cur_systems); conf_dirs.append(cur_dir)
 
     iter_name = make_iter_name(iter_index)
     train_path = os.path.join(iter_name, train_name)
@@ -519,7 +566,12 @@ def make_model_devi(iter_index,
         models = sorted(glob.glob(os.path.join(train_path, "best*pt")))
     # !!!!!!!!! modify part
     if generalML == True:
-        models1 = sorted(glob.glob(os.path.join(train_path, "general_graph*pb")))
+        if nequip_md == True:
+            models1 = sorted(glob.glob(os.path.join(train_path, "general_graph*pt")))
+        elif xtb_md == True:
+            models1 = []
+        else:
+            models1 = sorted(glob.glob(os.path.join(train_path, "general_graph*pb")))
     work_path = os.path.join(iter_name, model_devi_name)
     create_path(work_path)
     for mm in models :
@@ -538,20 +590,28 @@ def make_model_devi(iter_index,
     conf_path = os.path.join(work_path, 'confs')
     create_path(conf_path)
     sys_counter = 0 
-    for ss in conf_systems:
+
+    # also symlink the topo and bond information
+    for ss,dirs in zip(conf_systems,conf_dirs):
         conf_counter = 0
-        for cc in ss :
+        for cc,dir0 in zip(ss,dirs) :
             if model_devi_engine == "lammps":
                 conf_name = make_model_devi_conf_name(sys_idx[sys_counter], conf_counter)
                 orig_poscar_name = conf_name + '.orig.poscar'
                 poscar_name = conf_name + '.poscar'
                 lmp_name = conf_name + '.lmp'
+                topo_name = conf_name + '.topo'
+                bondlength_name = conf_name + '.bondlength'
+
                 if shuffle_poscar :
                     os.symlink(cc, os.path.join(conf_path, orig_poscar_name))
                     poscar_shuffle(os.path.join(conf_path, orig_poscar_name),
                                    os.path.join(conf_path, poscar_name))
                 else :
                     os.symlink(cc, os.path.join(conf_path, poscar_name))
+                    os.symlink(os.path.join(dir0,'topo.txt'),os.path.join(conf_path,topo_name))
+                    os.symlink(os.path.abspath('./atompair_length.txt'),os.path.join(conf_path,bondlength_name))
+
                 if 'sys_format' in jdata:
                     fmt = jdata['sys_format']
                 else:
@@ -591,6 +651,8 @@ def make_model_devi(iter_index,
 def _make_model_devi_native(iter_index, jdata, mdata, conf_systems):
     model_devi_jobs = jdata['model_devi_jobs']
     generalML = jdata.get('generalML',True)
+    nequip_md = jdata.get('nequip_md',True)
+    xtb_md = jdata.get('xtb_md',True)
     if (iter_index >= len(model_devi_jobs)) :
         return False
     cur_job = model_devi_jobs[iter_index]
@@ -620,7 +682,12 @@ def _make_model_devi_native(iter_index, jdata, mdata, conf_systems):
     train_path = os.path.abspath(train_path)
     models = glob.glob(os.path.join(train_path, "graph*pb"))
     if generalML == True:
-        models = glob.glob(os.path.join(train_path, "general_graph*pb"))
+        if nequip_md == True:
+            models = glob.glob(os.path.join(train_path, "general_graph*pt"))
+        elif xtb_md == True:
+            models = []
+        else:
+            models = glob.glob(os.path.join(train_path, "general_graph*pb"))
     task_model_list = []
     for ii in models:
         task_model_list.append(os.path.join('..', os.path.basename(ii)))
@@ -657,6 +724,10 @@ def _make_model_devi_native(iter_index, jdata, mdata, conf_systems):
                 for pp in press:
                     task_name = make_model_devi_task_name(sys_idx[sys_counter], task_counter)
                     conf_name = make_model_devi_conf_name(sys_idx[sys_counter], conf_counter) + '.lmp'
+                    # symlink the topo file and the bondlength file
+                    topo_name = make_model_devi_conf_name(sys_idx[sys_counter], conf_counter) + '.topo'
+                    bondlength_name = make_model_devi_conf_name(sys_idx[sys_counter], conf_counter) + '.bondlength'
+
                     task_path = os.path.join(work_path, task_name)
                     # dlog.info(task_path)
                     create_path(task_path)
@@ -664,9 +735,18 @@ def _make_model_devi_native(iter_index, jdata, mdata, conf_systems):
                     loc_conf_name = 'conf.lmp'
                     os.symlink(os.path.join(os.path.join('..','confs'), conf_name),
                                os.path.join(task_path, loc_conf_name) )
+                    os.symlink(os.path.join(os.path.join('..','confs'), topo_name),
+                               os.path.join(task_path, 'conf.topo') )
+                    os.symlink(os.path.join(os.path.join('..','confs'), bondlength_name), 
+                               os.path.join(task_path, 'conf.bondlength'))
                     cwd_ = os.getcwd()
                     if not os.path.isfile(os.path.join(task_path,'inference.py')):
                         os.symlink(os.path.join(cwd_,'inference.py'),os.path.join(task_path,'inference.py'))
+                        os.symlink(os.path.join(cwd_,'topo.py'),os.path.join(task_path,'topo.py'))
+                        if nequip_md == True:
+                            os.symlink(os.path.join(cwd_,'e3_layer_md.py'),os.path.join(task_path,'e3_layer_md.py'))
+                        if xtb_md == True:
+                            os.symlink(os.path.join(cwd_,'xtb_md.py'),os.path.join(task_path,'xtb_md.py'))
                     os.chdir(task_path)
                     try:
                         mdata["deepmd_version"]
@@ -705,6 +785,9 @@ def _make_model_devi_native(iter_index, jdata, mdata, conf_systems):
                     job["model_devi_dt"] =  model_devi_dt
                     with open('job.json', 'w') as _outfile:
                         json.dump(job, _outfile, indent = 4)
+                    with open('q_net.txt','w') as fp :
+                        q_net = jdata['charge_net'][sys_idx[sys_counter]]
+                        fp.write('%s'%(str(q_net))) 
                     os.chdir(cwd_)
                     with open(os.path.join(task_path, 'input.lammps'), 'w') as fp :
                         fp.write(file_c)
@@ -717,6 +800,8 @@ def run_model_devi (iter_index,
                     mdata):
     # !!!!!!! we also need nequip to perfrom md later
     generalML = jdata.get('generalML',True)
+    nequipMD = jdata.get('nequip_md',False)
+    xtbmd = jdata.get('xtb_md',False)
     model_devi_exec = mdata['model_devi_command']
 
     model_devi_group_size = mdata['model_devi_group_size']
@@ -735,22 +820,50 @@ def run_model_devi (iter_index,
 
     run_tasks_ = all_task
     run_tasks = [os.path.basename(ii) for ii in run_tasks_]
-    all_models = glob.glob(os.path.join(work_path, 'general_graph*pb'))
-    model_names = [os.path.basename(ii) for ii in all_models]
+    if nequipMD == True:
+        if generalML == True:
+            all_models = glob.glob(os.path.join(work_path, 'general_graph*pt'))
+            model_names = [os.path.basename(ii) for ii in all_models]
+        else:
+            all_models = glob.glob(os.path.join(work_path, 'best*.pt'))
+            model_names = [os.path.basename(ii) for ii in all_models]
+    else:
+        all_models = glob.glob(os.path.join(work_path, 'general_graph*pb'))
+        model_names = [os.path.basename(ii) for ii in all_models]
 
     model_devi_engine = jdata.get("model_devi_engine", "lammps")
     if model_devi_engine == "lammps":
-        command = "{ if [ ! -f dpgen.restart.10000 ]; then %s -i input.lammps -v restart 0; else %s -i input.lammps -v restart 1; fi }" % (model_devi_exec, model_devi_exec)
-        command = "/bin/sh -c '%s'" % command
-        commands = [command]
-        forward_files = ['conf.lmp', 'input.lammps', 'traj']
-        backward_files = ['model_devi.out', 'model_devi.log', 'traj']
-        if use_plm:
-            forward_files += ['input.plumed']
-           # backward_files += ['output.plumed']
-            backward_files += ['output.plumed','COLVAR']
-            if use_plm_path:
-                forward_files += ['plmpath.pdb']
+        if nequipMD == True:
+            if generalML == True:
+                command = "python3 e3_layer_md.py %s %s %s" %(cur_job['temps'][-1],cur_job['nsteps']+cur_job['trj_freq'], cur_job['trj_freq']) 
+                command = "/bin/sh -c '%s'" % command
+                commands = [command]
+                forward_files = ['conf.lmp', 'e3_layer_md.py', 'traj']
+                backward_files = ['monitor.csv','model_devi.log', 'traj']
+            else:
+                command = "python3 e3_layer_md.py %s %s %s %s %s" %(cur_job['temps'][-1],cur_job['nsteps']+cur_job['trj_freq'], cur_job['trj_freq'],jdata['bond_hi'],jdata['bond_lo'], str(1)) 
+                command = "/bin/sh -c '%s'" % command
+                commands = [command]
+                forward_files = ['conf.lmp', 'e3_layer_md.py', 'traj', 'topy.py', 'inference.py'] 
+                backward_files = ['monitor.csv','model_devi.log','traj','traj.hdf5','f_pred0.hdf5','f_pred1.hdf5','f_pred2.hdf5','f_pred3.hdf5','traj.hdf5','reasonable.txt']
+        elif xtbmd == True:
+            command = "python3 xtb_md.py %s %s %s" %(cur_job['temps'][-1],(cur_job['nsteps']+cur_job['trj_freq'])/1000.,cur_job['trj_freq'])
+            command = "/bin/sh -c '%s'" % command
+            commands = [command]
+            forward_files = ['conf.lmp', 'xtb_md.py', 'q_net.txt','traj']
+            backward_files = ['traj']
+        else:
+            command = "{ if [ ! -f dpgen.restart.10000 ]; then %s -i input.lammps -v restart 0; else %s -i input.lammps -v restart 1; fi }" % (model_devi_exec, model_devi_exec)
+            command = "/bin/sh -c '%s'" % command
+            commands = [command]
+            forward_files = ['conf.lmp', 'input.lammps', 'traj']
+            backward_files = ['model_devi.out', 'model_devi.log', 'traj']
+            if use_plm:
+                forward_files += ['input.plumed']
+                # backward_files += ['output.plumed']
+                backward_files += ['output.plumed','COLVAR']
+                if use_plm_path:
+                    forward_files += ['plmpath.pdb']
 
     cwd = os.getcwd()
 
@@ -758,6 +871,7 @@ def run_model_devi (iter_index,
     forward_files += [os.path.basename(file) for file in user_forward_files]
     backward_files += mdata.get("model_devi" + "_user_backward_files", [])
     api_version = mdata.get('api_version', '0.9')
+ 
     if LooseVersion(api_version) < LooseVersion('1.0'):
         warnings.warn(f"the dpdispatcher will be updated to new version."
             f"And the interface may be changed. Please check the documents for more details")
@@ -788,6 +902,68 @@ def run_model_devi (iter_index,
             errlog = 'model_devi.log')
         submission.run_submission()
 
+def copy_model_devi (iter_index,
+                     jdata,
+                     mdata) :
+    # !!!!!!! this operation can aviod too much md simulation 
+    iter_name = make_iter_name(iter_index)
+    work_path = os.path.join(iter_name, model_devi_name)
+    assert(os.path.isdir(work_path))
+
+    prev_name = make_iter_name(iter_index - 1)
+    prev_work_path = os.path.join(prev_name, model_devi_name)
+
+    all_task = glob.glob(os.path.join(work_path, "task.*"))
+    all_task.sort()
+    run_tasks_ = all_task
+    run_tasks = [os.path.basename(ii) for ii in run_tasks_]
+
+    for task in run_tasks:
+        os.system('rm -rf '+ os.path.join(work_path, task, 'traj'))
+        os.symlink(os.path.join(prev_work_path, task, 'traj'), os.path.join(work_path, task, 'traj'))
+    
+    command = "python3 e3_layer_md.py %s %s %s %s %s %s" %(cur_job['temps'][-1],cur_job['nsteps']+cur_job['trj_freq'], cur_job['trj_freq'],jdata['bond_hi'],jdata['bond_lo'], str(1))
+    command = "/bin/sh -c '%s'" % command
+    commands = [command]
+    forward_files = ['conf.lmp', 'e3_layer_md.py', 'traj', 'topy.py', 'inference.py']
+    backward_files = ['model_devi.log','traj','traj.hdf5','f_pred0.hdf5','f_pred1.hdf5','f_pred2.hdf5','f_pred3.hdf5','traj.hdf5','reasonable.txt']
+    
+    cwd = os.getcwd()
+
+    user_forward_files = mdata.get("model_devi" + "_user_forward_files", [])
+    forward_files += [os.path.basename(file) for file in user_forward_files]
+    backward_files += mdata.get("model_devi" + "_user_backward_files", [])
+    api_version = mdata.get('api_version', '0.9')
+
+    if LooseVersion(api_version) < LooseVersion('1.0'):
+        warnings.warn(f"the dpdispatcher will be updated to new version."
+            f"And the interface may be changed. Please check the documents for more details")
+        dispatcher = make_dispatcher(mdata['model_devi_machine'], mdata['model_devi_resources'], work_path, run_tasks, model_devi_group_size)
+        dispatcher.run_jobs(mdata['model_devi_resources'],
+                        commands,
+                        work_path,
+                        run_tasks,
+                        model_devi_group_size,
+                        model_names,
+                        forward_files,
+                        backward_files,
+                        outlog = 'model_devi.log',
+                        errlog = 'model_devi.log')
+
+    elif LooseVersion(api_version) >= LooseVersion('1.0'):
+        submission = make_submission(
+            mdata['model_devi_machine'],
+            mdata['model_devi_resources'],
+            commands=commands,
+            work_path=work_path,
+            run_tasks=run_tasks,
+            group_size=model_devi_group_size,
+            forward_common_files=model_names,
+            forward_files=forward_files,
+            backward_files=backward_files,
+            outlog = 'model_devi.log',
+            errlog = 'model_devi.log')
+        submission.run_submission()
 
 def post_model_devi (iter_index, 
                      jdata,
@@ -819,9 +995,8 @@ def post_model_devi (iter_index,
        trj_freq = cur_job.get("trj_freq",10); n_frames = int(cur_job.get("nsteps",1000)/trj_freq)+1
        attrs =  {'pos':('node','1x1o'),'species': ('node','1x0e'), 'energy': ('graph', '1x0e'), 'forces': ('node', '1x1o')}
        
-       command = f"python3 -c \"import dpdata;system = dpdata.System('traj/0.lammpstrj',fmt='dump',type_map={type_map}); [system.append(dpdata.System('traj/%d.lammpstrj'%(i * {trj_freq}),fmt='dump', type_map={type_map})) for i in range(1,{n_frames})]; system.nopbc = True; system.to_deepmd_npy('traj_deepmd')\""
+       command = "python3 topo.py %s %s %s" %(jdata["bond_hi"],jdata["bond_lo"],trj_freq) 
        command += f"&& python3 -c \"import numpy as np; from e3_layers.data import Batch; import ase; atomic_n = ase.atom.atomic_numbers; coord = np.load('traj_deepmd/set.000/coord.npy'); coord = np.array(coord,dtype=np.single); type = np.loadtxt('traj_deepmd/type.raw'); type_map = {type_map}; species_n = [atomic_n[type_map[int(u)]] for u in type]; species_n = np.array(species_n,dtype=np.intc); e = np.array(0., dtype=np.single); lst = []; [lst.append(dict(pos=coord[ii].reshape((len(species_n),3)),energy=e, forces = coord[ii].reshape((len(species_n),3)), species=species_n)) for ii in range(len(coord))]; path = 'traj.hdf5'; attrs = {attrs}; batch = Batch.from_data_list(lst, attrs); batch.dumpHDF5(path)\""
-
        command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5'}\" --model_path ../best.000.pt --output_keys forces --output_path f_pred0.hdf5" 
        command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5'}\" --model_path ../best.001.pt --output_keys forces --output_path f_pred1.hdf5"
        command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5'}\" --model_path ../best.002.pt --output_keys forces --output_path f_pred2.hdf5"
@@ -829,17 +1004,17 @@ def post_model_devi (iter_index,
        
        commands = [command] 
        forward_files = ['traj']
-       forward_files += ['inference.py']
-       backward_files = ['f_pred0.hdf5','f_pred1.hdf5','f_pred2.hdf5','f_pred3.hdf5','traj.hdf5']
+       forward_files += ['inference.py','conf.topo','conf.bondlength','topo.py','conf.lmp']
+       backward_files = ['f_pred0.hdf5','f_pred1.hdf5','f_pred2.hdf5','f_pred3.hdf5','traj.hdf5','reasonable.txt']
        cwd = os.getcwd()
        user_forward_files = mdata.get("model_devi" + "_user_forward_files",[])
        forward_files += [os.path.basename(file) for file in user_forward_files]
        backward_files += mdata.get("model_devi" + "_user_backward_files", [])
        api_version = mdata.get('api_version', '0.9')
-       mpreddata = mdata['model_devi_resources']
+       mpreddata = mdata['train_resources']
        mpreddata['source_list'] = ['/root/e3_layer.sh']
        mpreddata['number_node'] = mpreddata['number_node'] - 49
-       #mpreddata['group_size'] = mdata['model_devi_resources']['group_size']
+       mpreddata['group_size'] = 10 #mdata['model_devi_resources']['group_size'] 
        if LooseVersion(api_version) < LooseVersion('1.0'):
           warnings.warn(f"the dpdispatcher will be updated to new version."
             f"And the interface may be changed. Please check the documents for more details")
@@ -1001,7 +1176,8 @@ def _select_by_model_devi_adaptive_trust_low(
                 model_devi = np.loadtxt(os.path.join(tt, 'model_devi_online.out'))
             else:
                 model_devi = np.loadtxt(os.path.join(tt, 'model_devi.out'))
-            #model_devi = _read_model_devi_file(tt, model_devi_f_avg_relative,generalML=generalML)
+            #!!!!! if unreasonable structres is observed, the structures behind them will be assumed as failed
+            unreason = False
             for ii in range(model_devi.shape[0]):
                 if model_devi[ii][0] < model_devi_skip :
                     continue
@@ -1010,7 +1186,11 @@ def _select_by_model_devi_adaptive_trust_low(
                 # cc: time step of the frame
                 md_v = model_devi[ii][idx_v]
                 md_f = model_devi[ii][idx_f]
-                if md_f > f_trust_hi or md_v > v_trust_hi:
+                if md_f > 900.:
+                    unreason = True
+                if generalML == False and md_f > f_trust_hi:
+                    unreason = True
+                if md_f > f_trust_hi or md_v > v_trust_hi or unreason == True:
                     failed.append([tt, cc])
                 else:
                     coll_v.append([model_devi[ii][idx_v], tt, cc])
@@ -1102,7 +1282,7 @@ def _make_fp_vasp_inner (modd_path,
     system_index = list(set_tmp)
     system_index.sort()
 
-    fp_tasks = []
+    fp_tasks = []; numb_task_all = []; fp_candidate_all = []; fp_hist_idx_all = []
 
     charges_recorder = [] # record charges for each fp_task, remember amons have differnt net charge
     charges_map = jdata.get("sys_charges", [])
@@ -1124,6 +1304,12 @@ def _make_fp_vasp_inner (modd_path,
         else:
             sys_lim = lim
         return sys_lim
+
+    fp_task_max_acc_conv = int(len(jdata['all_sys_idx'])/len(jdata['model_devi_jobs'][-1]['sys_idx'])*jdata['fp_task_max'])
+    fp_task_max_acc_conv = min(fp_task_max_acc_conv, jdata['fp_task_max_hi'])
+
+    # we need to static the number of whole fp candidate and fp task, as if over 10,000 configs will generate much too fp tasks
+    total_candi_max = 0; total_fp_max = 0; do_md = True; do_part_fp = False
 
     for ss in system_index:
         modd_system_glob = os.path.join(modd_path, 'task.' + ss + '.*')
@@ -1168,15 +1354,45 @@ def _make_fp_vasp_inner (modd_path,
         if prev_path == None:
             patience_num = 0
             largermse_num = 0
+            fp_hist_idx_all.append([])
         else:
+            if os.path.isfile(os.path.join(prev_path,'md_cond')):
+                last_do_md = np.loadtxt(os.path.join(prev_path,'md_cond'))[0]
+                if os.path.isfile(os.path.join(prev_path,str(ss)+'.fp_hist_idx')):
+                    fp_hist_idx = np.loadtxt(os.path.join(prev_path,str(ss)+'.fp_hist_idx'))
+                    if int(last_do_md) == 1:
+                        fp_hist_idx = []
+                else:
+                    fp_hist_idx = []
+                if isinstance(fp_hist_idx,list):
+                    fp_hist_idx_all.append(fp_hist_idx)
+                else:
+                    if len(fp_hist_idx.shape) > 0: 
+                        fp_hist_idx_all.append([int(idx) for idx in fp_hist_idx])
+                    else:
+                        fp_hist_idx_all.append([int(fp_hist_idx)])
+            else:
+                fp_hist_idx_all.append([])
+
             prev_static_path = os.path.join(prev_path,'static.'+ss)
             if os.path.isfile(prev_static_path):
                 prev_static = np.loadtxt(prev_static_path)
                 patience_num = int(prev_static[-1])
                 largermse_num = int(prev_static[-2])
-                rmse_f = np.load(os.path.join(prev_path,'data.'+ss))['rmse_f']
-                if rmse_f > jdata['rmse_f_cri']:
-                    largermse_num += 1
+                # define the largermse_num, if rmse_f < rmse_f_cri_hi and conf_idx < 0.05 * conf_all
+                if os.path.isfile(os.path.join(prev_path,'data.'+ss,'static.npz')):
+                    rmse_f = np.load(os.path.join(prev_path,'data.'+ss,'static.npz'))['rmse_f']
+                    if rmse_f < jdata['rmse_f_cri_hi']:
+                        largermse_num += 1
+                    else:
+                        largermse_num = 0
+                else:
+                    if os.path.isfile(os.path.join(prev_path,'md_cond')):
+                        part_fp = np.loadtxt(os.path.join(prev_path,'md_cond'))[1]
+                        if int(part_fp) == 0:
+                            largermse_num += 1
+                    else:
+                        largermse_num += 1
             else:
                 patience_num = 0
                 largermse_num = 0
@@ -1190,10 +1406,12 @@ def _make_fp_vasp_inner (modd_path,
         else:
             patience_num = 0
         
+        # if conf_idx > 0.05 * conf_all or new temperature; largerrmse_num = 0
         if len(jdata["model_devi_jobs"]) > 1 and jdata["model_devi_jobs"][-2]["temps"][-1] < jdata["model_devi_jobs"][-1]["temps"][-1]:
             largermse_num = 0
-
-        np.savetxt(os.path.join(work_path,'static.'+ss),[len(fp_rest_accurate)/fp_sum,len(fp_candidate)/fp_sum,len(fp_rest_failed)/fp_sum,largermse_num,patience_num])
+        if len(jdata['model_devi_jobs'][-1]['sys_idx'])/len(jdata['all_sys_idx']) > 1 -  jdata["conv_ratio"]:
+            largermse_num = 0
+        
         for cc_key, cc_value in counter.items():
             dlog.info("system {0:s} {1:9s} : {2:6d} in {3:6d} {4:6.2f} %".format(ss, cc_key, cc_value, fp_sum, cc_value/fp_sum*100))
         random.shuffle(fp_candidate)
@@ -1212,24 +1430,79 @@ def _make_fp_vasp_inner (modd_path,
         # set number of tasks
         accurate_ratio = float(counter['accurate']) / float(fp_sum)
         if accurate_ratio < fp_accurate_soft_threshold :
-            this_fp_task_max = fp_task_max
+            this_fp_task_max = max(fp_task_max, fp_task_max_acc_conv)
         elif accurate_ratio >= fp_accurate_soft_threshold and accurate_ratio < fp_accurate_threshold:
             this_fp_task_max = int(fp_task_max * (accurate_ratio - fp_accurate_threshold) / (fp_accurate_soft_threshold - fp_accurate_threshold))
+            # if most of the configs are converged, enlarge the fp_tasks of rest configs 
+            if this_fp_task_max > 0:
+                this_fp_task_max = int(fp_task_max_acc_conv * (accurate_ratio - fp_accurate_threshold) / (fp_accurate_soft_threshold - fp_accurate_threshold))
         else:
             this_fp_task_max = 0
         numb_task = min(this_fp_task_max, len(fp_candidate))
+        
+        # !!! add candidate and fp task here
+        total_candi_max += len(fp_candidate) 
+        total_fp_max += numb_task
+        # !!! avoid too early stop md explore
+        if len(fp_rest_failed) > 0:
+            patience_num = 0
+            # !!! avoid always generate unreasonable structures due to the topo is imagined
+            if len(jdata['model_devi_jobs'][-1]['sys_idx'])/len(jdata['all_sys_idx']) < 1 - jdata["fp_accurate_soft_threshold"]:
+                pass
+            else:
+                largermse_num = 0
+        
+        np.savetxt(os.path.join(work_path,'static.'+ss),[len(fp_rest_accurate)/fp_sum,len(fp_candidate)/fp_sum,len(fp_rest_failed)/fp_sum,largermse_num,patience_num])
+        
         if (numb_task < fp_task_min):
             numb_task = 0
         dlog.info("system {0:s} accurate_ratio: {1:8.4f}    thresholds: {2:6.4f} and {3:6.4f}   eff. task min and max {4:4d} {5:4d}   number of fp tasks: {6:6d}".format(ss, accurate_ratio, fp_accurate_soft_threshold, fp_accurate_threshold, fp_task_min, this_fp_task_max, numb_task))
-        # make fp tasks
+        numb_task_all.append(numb_task); fp_candidate_all.append(fp_candidate)
+    
+    #!!!! make fp tasks; here we need to sample part of fps if fps are too much; record the idx have chosen as the fp tasks
+    if total_candi_max > jdata['total_candi_max']:
+        do_md = False
+    else:
+        do_md = True
+    if total_fp_max > jdata['total_fp_max']:
+        do_part_fp = True
+    else:
+        do_part_fp = False
+    np.savetxt(os.path.join(work_path,'md_cond'),[int(do_md),int(do_part_fp)])
+    
+    if do_part_fp == True:
+        task_ratio = jdata['total_fp_max']/total_fp_max 
+        _numb_task_all = [int(uu*task_ratio) for uu in num_task_all]
+        #!!!!! avoid all fp_num is 0
+        if np.sum(np.array(_numb_task_all)) < jdata['total_fp_max'] * 0.5:
+            _numb_task_all = np.zeros(len(num_task_all))
+            if len(_numb_task_all) > jdata['toal_fp_max']:
+                _idx = np.argsort(-num_task_all)[0:jdata['total_fp_max']]
+                _numb_task_all[_idx] = 1.
+            else:
+                _numb_task_all = int(jdata['total_fp_max']/len(_numb_task_all))
+
+            for ii,uu in enumerate(num_task_all):
+                _numb_task_all[ii] = int(min(_numb_task_all[ii],uu))
+    else:
+        _numb_task_all = numb_task_all
+    
+    for ss_idx, ss in enumerate(system_index):
         model_devi_engine = jdata.get("model_devi_engine", "lammps")
         count_bad_box = 0
         count_bad_cluster = 0
+        numb_task = _numb_task_all[ss_idx]; fp_candidate = fp_candidate_all[ss_idx]; fp_hist_idx = fp_hist_idx_all[ss_idx]
+        fp_hist_idx_cur = []
         for cc in range(numb_task) :
             tt = fp_candidate[cc][0]
             ii = fp_candidate[cc][1]
             ss = os.path.basename(tt).split('.')[1]
             conf_name = os.path.join(tt, "traj")
+            if ii in fp_hist_idx:
+                continue
+            else:
+                fp_hist_idx.append(ii)
+                fp_hist_idx_cur.append(ii)
             if model_devi_engine == "lammps":
                 conf_name = os.path.join(conf_name, str(ii) + '.lammpstrj')
             elif model_devi_engine == "gromacs":
@@ -1237,6 +1510,7 @@ def _make_fp_vasp_inner (modd_path,
             else:
                 raise RuntimeError("unknown model_devi engine", model_devi_engine)
             conf_name = os.path.abspath(conf_name)
+            
             if skip_bad_box is not None:
                 skip = check_bad_box(conf_name, skip_bad_box)
                 if skip:
@@ -1277,10 +1551,16 @@ def _make_fp_vasp_inner (modd_path,
             for pair in fp_link_files :
                 os.symlink(pair[0], pair[1])
             os.chdir(cwd)
+        np.savetxt(os.path.join(work_path,str(ss)+'.fp_hist_idx_cur'),fp_hist_idx_cur)
+        if do_md == False:
+            np.savetxt(os.path.join(work_path,str(ss)+'.fp_hist_idx'),fp_hist_idx)
+        else:
+            np.savetxt(os.path.join(work_path,str(ss)+'.fp_hist_idx'),[])
         if count_bad_box > 0:
             dlog.info("system {0:s} skipped {1:6d} confs with bad box, {2:6d} remains".format(ss, count_bad_box, numb_task - count_bad_box))
         if count_bad_cluster > 0:
             dlog.info("system {0:s} skipped {1:6d} confs with bad cluster, {2:6d} remains".format(ss, count_bad_cluster, numb_task - count_bad_cluster))
+
     if cluster_cutoff is None:
         cwd = os.getcwd()
         for idx, task in enumerate(fp_tasks):
@@ -1298,7 +1578,12 @@ def _make_fp_vasp_inner (modd_path,
             else:
                 raise RuntimeError("unknown model_devi engine", model_devi_engine)
             os.chdir(cwd)
-    return fp_tasks
+    
+    # if actual fp tasks is much less than chosen fp tasks and fp_tasks is small
+    if len(fp_tasks) < jdata['total_fp_max'] and len(fp_tasks) < 0.8 * np.sum(np.array(_numb_task_all)):
+        do_md = True; do_part_fp = False
+
+    return fp_tasks, do_md, do_part_fp
 
 def _make_fp_vasp_configs(iter_index, 
                          jdata):
@@ -1326,7 +1611,7 @@ def _make_fp_vasp_configs(iter_index,
             task_min = cur_job['task_min']
 
     # make configs
-    fp_tasks = _make_fp_vasp_inner(modd_path, work_path,
+    fp_tasks, do_md, do_part_fp = _make_fp_vasp_inner(modd_path, work_path,
                                    previous_path,
                                    model_devi_skip,
                                    v_trust_lo, v_trust_hi,
@@ -1335,12 +1620,12 @@ def _make_fp_vasp_configs(iter_index,
                                    [],
                                    type_map,
                                    jdata)
-    return fp_tasks
+    return fp_tasks, do_md, do_part_fp
 
 def make_fp_gaussian(iter_index,
                      jdata):
     # make config
-    fp_tasks = _make_fp_vasp_configs(iter_index, jdata)
+    fp_tasks, do_md, do_part_fp = _make_fp_vasp_configs(iter_index, jdata)
     if len(fp_tasks) == 0 :
         return
     # make gaussian gjf file
@@ -1353,10 +1638,15 @@ def make_fp_gaussian(iter_index,
     cwd = os.getcwd()
 
     model_devi_engine = jdata.get('model_devi_engine', 'lammps')
+    #infer_file = os.path.abspath('./e3_layer_infer.py')
+
     for ii in fp_tasks:
         os.chdir(ii)
+        #os.symlink(infer_file,'e3_layer_infer.py')
+        q_net = jdata['charge_net'][int(os.path.basename(ii).split('.')[1])]
         if model_devi_engine == "lammps":
             sys_data = dpdata.System('POSCAR').data
+        sys_data['charge'] = q_net
         ret = make_gaussian_input(sys_data, fp_params)
         with open('input.com', 'w') as fp:
             fp.write(ret)
@@ -1377,102 +1667,136 @@ def make_fp (iter_index,
     work_path = os.path.join(iter_name, fp_name)
     symlink_user_forward_files(mdata=mdata, task_type="fp", work_path=work_path)
 
+def run_fp_inner (iter_index,
+                  jdata, 
+                  mdata,
+                  forward_files,
+                  backward_files,
+                  check_fin,
+                  log_file = "fp.log",
+                  forward_common_files=[]):
+    fp_command = mdata['fp_command']
+    fp_group_size = mdata['fp_group_size']
+    fp_resources = mdata['fp_resources']
+    mark_failure = fp_resources.get('mark_failure', False)
+
+    iter_name = make_iter_name(iter_index)
+    work_path = os.path.join(iter_name, fp_name)
+
+    fp_tasks = glob.glob(os.path.join(work_path, 'task.*'))
+    fp_tasks.sort()
+    if len(fp_tasks) == 0 :
+        return
+
+    fp_run_tasks = fp_tasks
+    run_tasks = [os.path.basename(ii) for ii in fp_run_tasks]
+
+    user_forward_files = mdata.get("fp" + "_user_forward_files", [])
+    forward_files += [os.path.basename(file) for file in user_forward_files]
+    backward_files += mdata.get("fp" + "_user_backward_files", [])
+    
+    api_version = mdata.get('api_version', '0.9')
+    if LooseVersion(api_version) < LooseVersion('1.0'):
+        warnings.warn(f"the dpdispatcher will be updated to new version."
+            f"And the interface may be changed. Please check the documents for more details")
+        dispatcher = make_dispatcher(mdata['fp_machine'], mdata['fp_resources'], work_path, run_tasks, fp_group_size)
+        dispatcher.run_jobs(mdata['fp_resources'],
+                        [fp_command],
+                        work_path,
+                        run_tasks,
+                        fp_group_size,
+                        forward_common_files,
+                        forward_files,
+                        backward_files,
+                        mark_failure = mark_failure,
+                        outlog = log_file,
+                        errlog = log_file)
+
+    elif LooseVersion(api_version) >= LooseVersion('1.0'):
+        submission = make_submission(
+            mdata['fp_machine'],
+            mdata['fp_resources'],
+            commands=[fp_command],
+            work_path=work_path,
+            run_tasks=run_tasks,
+            group_size=fp_group_size,
+            forward_common_files=forward_common_files,
+            forward_files=forward_files,
+            backward_files=backward_files,
+            outlog = log_file,
+            errlog = log_file)
+        submission.run_submission()
+
 def run_fp(iter_index, 
            jdata,
            mdata) :
     fp_style = jdata['fp_style']
     fp_pp_files = jdata['fp_pp_files']
     if fp_style == "gaussian":
-        forward_files = ['input.com']
-        backward_files = ['output']
+        forward_files = ['input.com','e3_layer_infer.py']
+        backward_files = ['output','single.npz']
         run_fp_inner(iter_index, jdata, mdata, forward_files, backward_files, _gaussian_check_fin, log_file = 'output')
     else:
         raise RuntimeError ("unsupported fp style")
 
-def _online_model_err(iter_index,mdata,jdata):
-    # record online fp errors need generate fp.hdf5
-    model_devi_group_size = mdata['model_devi_group_size']
-    model_devi_resources = mdata['model_devi_resources']
-
+def _offline_model_err(iter_index,mdata,jdata):
     iter_name = make_iter_name(iter_index)
-    train_path = os.path.join(iter_name, train_name)
-    train_path = os.path.abspath(train_path)
-    models = sorted(glob.glob(os.path.join(train_path, "best*.pt")))
-    model_names = [os.path.basename(ii) for ii in models]
     work_path = os.path.join(iter_name, fp_name)
-    for mm in models:
-        model_name = os.path.basename(mm)
-        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        if not os.path.isfile(os.path.join(work_path, model_name)):
-            os.symlink(mm, os.path.join(work_path, model_name))
-    
     all_tasks = glob.glob(os.path.join(work_path, "data.*"))
     all_tasks.sort()
     run_tasks_ = all_tasks
     run_tasks = [os.path.basename(ii) for ii in run_tasks_]
-    type_map = jdata.get('type_map')
+    type_map = jdata['type_map']
     attrs = {'pos':('node','1x1o'),'species': ('node','1x0e'), 'energy': ('graph', '1x0e'), 'forces': ('node', '1x1o')}
-    
-    command = f"python3 -c \"import numpy as np; from e3_layers.data import Batch; import ase; atomic_n = ase.atom.atomic_numbers; coord = np.load('set.000/coord.npy'); type = np.loadtxt('type.raw'); type_map = {type_map}; species_n = [atomic_n[type_map[int(u)]] for u in type]; energy = np.load('set.000/energy.npy'); force = np.load('set.000/force.npy'); coord = np.array(coord, dtype=np.single); force = np.array(force,dtype=np.single); energy = np.array(energy,dtype=np.single); species_n = np.array(species_n,dtype=np.intc); lst = []; [lst.append(dict(pos=coord[ii].reshape((len(species_n),3)),energy=energy[ii],forces=force[ii],species=np.array(species_n))) for ii in range(len(coord))]; path = 'fp.hdf5'; attrs = {attrs}; batch = Batch.from_data_list(lst, attrs); batch.dumpHDF5(path)\""
-    command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'fp.hdf5'}\" --model_path ../best.000.pt --output_keys forces --output_path f_pred0.hdf5"
-    command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'fp.hdf5'}\" --model_path ../best.001.pt --output_keys forces --output_path f_pred1.hdf5"
-    command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'fp.hdf5'}\" --model_path ../best.002.pt --output_keys forces --output_path f_pred2.hdf5"
-    command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'fp.hdf5'}\" --model_path ../best.003.pt --output_keys forces --output_path f_pred3.hdf5"
-    
-    commands = [command]
-    forward_files = ['set.000','type.raw']
-    forward_files += ['inference.py']
-    backward_files = ['f_pred0.hdf5','f_pred1.hdf5','f_pred2.hdf5','f_pred3.hdf5','fp.hdf5']
-    cwd = os.getcwd()
-    user_forward_files = mdata.get("model_devi" + "_user_forward_files",[])
-    forward_files += [os.path.basename(file) for file in user_forward_files]
-    backward_files += mdata.get("model_devi" + "_user_backward_files", [])
-    api_version = mdata.get('api_version', '0.9')
-    mpreddata = mdata['model_devi_resources']
-    mpreddata['number_node'] = mpreddata['number_node'] - 49
-    mpreddata['source_list'] = ['/root/e3_layer.sh']
-    if LooseVersion(api_version) < LooseVersion('1.0'):
-        warnings.warn(f"the dpdispatcher will be updated to new version."
-            f"And the interface may be changed. Please check the documents for more details")
-        dispatcher = make_dispatcher(mdata['train_machine'], mpreddata, work_path, run_tasks, model_devi_group_size)
-        dispatcher.run_jobs(model_devi_resources,
-                        commands,
-                        work_path,
-                        run_tasks,
-                        model_devi_group_size,
-                        model_names,
-                        forward_files,
-                        backward_files,
-                        outlog = 'model_devi.log',
-                        errlog = 'model_devi.log')
-
-    elif LooseVersion(api_version) >= LooseVersion('1.0'):
-        submission = make_submission(
-            mdata['train_machine'],
-            mpreddata,
-            commands=commands,
-            work_path=work_path,
-            run_tasks=run_tasks,
-            group_size=model_devi_group_size,
-            forward_common_files=model_names,
-            forward_files=forward_files,
-            backward_files=backward_files,
-            outlog = 'model_devi.log',
-            errlog = 'model_devi.log')
-    submission.run_submission()
+    cwd_ = os.getcwd(); atomic_n = ase.atom.atomic_numbers
+    for dir0 in all_tasks:
+        os.chdir(dir0)
+        coord = np.load('set.000/coord.npy')
+        type_ele = np.loadtxt('type.raw')
+        species_n = [atomic_n[type_map[int(u)]] for u in type_ele]
+        energy = np.load('set.000/energy.npy')
+        force = np.load('set.000/force.npy')
+        coord = np.array(coord, dtype=np.single)
+        force = np.array(force,dtype=np.single)
+        energy = np.array(energy,dtype=np.single)
+        species_n = np.array(species_n,dtype=np.intc)
+        lst = []
+        [lst.append(dict(pos=coord[ii].reshape((len(species_n),3)),energy=energy[ii],forces=force[ii],species=np.array(species_n))) for ii in range(len(coord))]
+        path = 'fp.hdf5'
+        batch = Batch.from_data_list(lst, attrs); batch.dumpHDF5(path)
+        os.chdir(cwd_)
     return all_tasks
 
-def _get_err(run_tasks): 
+
+def _get_err(work_path,run_tasks,trj_freq): 
     # !!!!!! we need to get the rmse and max for each config and the rmse on each batch
+
     cwd = os.getcwd()
     for idx, task in enumerate(run_tasks):
+        
+        candidate_idxs = np.loadtxt(os.path.join(work_path,os.path.basename(task).split('.')[1]+'.fp_hist_idx_cur'))
+        atom_ord = np.loadtxt(os.path.join(task,'atom_ord'))
+        atom_ord = [int(u) for u in atom_ord]
+        if candidate_idxs.shape == ():
+            candidate_idxs = [int(candidate_idxs / trj_freq)]
+        else:
+            candidate_idxs = [int(u/trj_freq) for u in candidate_idxs]
         os.chdir(task)
         f0 = h5py.File('f_pred0.hdf5','r')['forces'][:]; f1 = h5py.File('f_pred1.hdf5','r')['forces'][:]
         f2 = h5py.File('f_pred2.hdf5','r')['forces'][:]; f3 = h5py.File('f_pred3.hdf5','r')['forces'][:]
-        f_label = h5py.File('fp.hdf5','r')['forces'][:]; n_frame = h5py.File('fp.hdf5','r')['energy'].shape[0]; n_atoms = f0.shape[0]
-        f0 = f0.reshape((n_frame,int(n_atoms/n_frame),3)); f1 = f1.reshape((n_frame,int(n_atoms/n_frame),3))
-        f2 = f2.reshape((n_frame,int(n_atoms/n_frame),3)); f3 = f3.reshape((n_frame,int(n_atoms/n_frame),3))
-        f_label = f_label.reshape((n_frame,int(n_atoms/n_frame),3))
+
+        f_label = h5py.File('fp.hdf5','r')['forces'][:]; n_frame = h5py.File('fp.hdf5','r')['energy'].shape[0]
+        n_atoms = f_label.shape[0]; f_label = f_label.reshape((n_frame,int(n_atoms/n_frame),3))
+
+        mol_atom_n = f_label.shape[1]; all_atom_n = f0.shape[0]
+        f0 = f0.reshape((int(all_atom_n/mol_atom_n),mol_atom_n,3)); f1 = f1.reshape((int(all_atom_n/mol_atom_n),mol_atom_n,3))
+        f2 = f2.reshape((int(all_atom_n/mol_atom_n),mol_atom_n,3)); f3 = f3.reshape((int(all_atom_n/mol_atom_n),mol_atom_n,3))
+        f0 = f0[candidate_idxs]; f1 = f1[candidate_idxs]; f2 = f2[candidate_idxs]; f3 = f3[candidate_idxs]
+        
+        for ii in range(len(f0)):
+            f0[ii] = f0[ii][atom_ord]; f1[ii] = f1[ii][atom_ord]
+            f2[ii] = f2[ii][atom_ord]; f3[ii] = f3[ii][atom_ord]
+
         rmse = np.sqrt(np.mean((f0 - f_label)**2))
         rmse_single = []; max_single = []
         for ii in range(len(f0)):
@@ -1493,6 +1817,7 @@ def post_fp_gaussian (iter_index,
     model_devi_adapt_trust_lo = jdata.get('model_devi_adapt_trust_lo', False)
     iter_name = make_iter_name(iter_index)
     work_path = os.path.join(iter_name, fp_name)
+    modd_path = os.path.abspath(os.path.join(iter_name, model_devi_name))
     fp_tasks = glob.glob(os.path.join(work_path, 'task.*'))
     fp_tasks.sort()
     if len(fp_tasks) == 0 :
@@ -1507,6 +1832,7 @@ def post_fp_gaussian (iter_index,
     system_index.sort()
 
     cwd = os.getcwd()
+
     for ss in system_index :
         sys_output = glob.glob(os.path.join(work_path, "task.%s.*/input.log"%ss))
         sys_output.sort()
@@ -1530,9 +1856,32 @@ def post_fp_gaussian (iter_index,
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         if not os.path.isfile(os.path.join(work_path, 'data.%s'%ss, 'inference.py')):
             os.symlink(os.path.join(cwd,'inference.py'),os.path.join(work_path, 'data.%s'%ss, 'inference.py'))
+            os.symlink(os.path.join(modd_path, 'task.%s'%ss+'.%06d'%(0), 'f_pred0.hdf5'), os.path.join(work_path, 'data.%s'%ss, 'f_pred0.hdf5'))
+            os.symlink(os.path.join(modd_path, 'task.%s'%ss+'.%06d'%(0), 'f_pred1.hdf5'), os.path.join(work_path, 'data.%s'%ss, 'f_pred1.hdf5'))
+            os.symlink(os.path.join(modd_path, 'task.%s'%ss+'.%06d'%(0), 'f_pred2.hdf5'), os.path.join(work_path, 'data.%s'%ss, 'f_pred2.hdf5'))
+            os.symlink(os.path.join(modd_path, 'task.%s'%ss+'.%06d'%(0), 'f_pred3.hdf5'), os.path.join(work_path, 'data.%s'%ss, 'f_pred3.hdf5'))
+        
+        log_file = os.path.basename(sys_output[0]); f_read = False; atom_ord = []
+        conf_file = os.path.join(sys_output[0][:-len(log_file)],'conf.dump')
+        with open(conf_file,'r') as fp:
+            for line in fp:
+                if line.startswith('ITEM: ATOMS id type x y z fx fy fz'):
+                    f_read = True
+                elif f_read == True:
+                    line = line.strip().split()
+                    atom_ord.append(int(line[1]))
+        atom_convert_ord = []
+        
+        for ii in range(len(jdata['type_map'])):
+            for jj in range(len(atom_ord)):
+                if atom_ord[jj] == ii + 1:
+                    atom_convert_ord.append(jj)
+        
+        np.savetxt(os.path.join(work_path,'data.%s'%ss, 'atom_ord'), atom_convert_ord)
+
     #if model_devi_adapt_trust_lo:
-    run_tasks = _online_model_err(iter_index,mdata,jdata)
-    _get_err(run_tasks)
+    run_tasks = _offline_model_err(iter_index,mdata,jdata)
+    _get_err(work_path,run_tasks,jdata['model_devi_jobs'][-1]['trj_freq'])
         
 
 def post_fp (iter_index,
@@ -1568,10 +1917,10 @@ def set_version(mdata):
     return mdata
 
 
-#def _single_sys_adjusted(f_trust_lo,f_trust_hi,ii,generalML,conver_cri,max_f_cri,rmse_f_cri):
 def _single_sys_adjusted(f_trust_lo,f_trust_hi,ii,generalML,jdata):
-    # if generalML == False; also need to adjust trust_hi
-    # !!! we may also static correlation of model_devi and model_err and give warning
+    # !!!!!! this function is important, it is used to adjust the trust_lo and turst_hi dynamically during the md explore 
+    # !!!!!! with the combination of topo.py, we can chose the reasonable but rarely sampled configurations 
+
     conver_cri = jdata['fp_accurate_threshold']; max_f_cri = jdata['max_f_cri']
     rmse_f_cri = jdata['rmse_f_cri']; fp_task_max = jdata['fp_task_max']
     rmse_f_cri_hi = jdata['rmse_f_cri_hi']; max_f_cri_hi = jdata['max_f_cri_hi']
@@ -1588,16 +1937,26 @@ def _single_sys_adjusted(f_trust_lo,f_trust_hi,ii,generalML,jdata):
     conv = False
     if static_ratio[0] > conver_cri or this_fp_task_max == 0:
         conv = True
-    elif static_ratio[-2] >= jdata['model_devi_patience']*7 and rnse_f_static < rmse_f_cri_hi and np.max(model_max_f) < max_f_cri_hi:
+    elif static_ratio[-2] > jdata['model_devi_patience'] -1 and np.max(model_max_f) < max_f_cri_hi:
         conv = True
+    
     # adjust the trust_lo, trust_hi; need reload previous model_max_f and model_devi_f; maybe save as a file
-    if generalML == True:
-        f_trust_hi = 100.
-    else:
-        pass
+    #if generalML == True:
+    #    f_trust_hi = 100.
+    #else:
+    #    pass
 
     n_cand = np.where(model_rmse_f > rmse_f_cri)[0]
-    # first adjust if trust_lo is too high
+
+    adjust_hi = False
+    if np.max(model_devi_f) > f_trust_hi: 
+        adjust_hi = True
+        n_unreason = len(np.where(model_devi_f > f_trust_hi)[0])
+        f_unreason = sorted(model_max_f)[-n_unreason]
+    else:
+        if np.max(model_max_f) > max_f_cri * 2.:
+            f_trust_hi = np.max(model_devi_f)
+
     if static_ratio[0] > 4*conver_cri - 3 or this_fp_task_max < 4:
         if rmse_f_static > rmse_f_cri / (min((4*conver_cri - 3), static_ratio[0])):
             f_trust_lo = f_trust_lo * ((rmse_f_cri / rmse_f_static)**0.5)
@@ -1608,6 +1967,14 @@ def _single_sys_adjusted(f_trust_lo,f_trust_hi,ii,generalML,jdata):
         elif len(n_cand)/len(model_rmse_f) < 0.4:
             #n_acc = max(0,len(model_devi_f)-len(n_cand)*2)
             f_trust_lo = sorted(model_devi_f)[0]
+        # adjust if the trust_hi is too high
+        if adjust_hi == True:
+            if rmse_f_static < rmse_f_cri:
+                f_trust_hi = 1.05 * f_trust_hi
+            elif rmsf_f_static > rmse_f_cri_h:
+                f_trust_hi = 0.95 * f_trust_hi
+            elif f_unreason > max_f_cri * 2.:
+                f_trust_hi = 0.95 * f_trust_hi
     else:
         if len(n_cand)/len(model_rmse_f) < 0.4 and rmse_f_static < rmse_f_cri:
             f_acc = []
@@ -1620,7 +1987,12 @@ def _single_sys_adjusted(f_trust_lo,f_trust_hi,ii,generalML,jdata):
             if np.max(f_acc) < max_f_cri:
                 n_acc = int(max(0,len(model_devi_f) - len(n_cand)*2.5 - 2))
                 f_trust_lo = sorted(model_devi_f)[n_acc]
-    
+        # adjust if the trust_hi is too high
+        if adjust_hi == True:
+            if rmse_f_static < rmse_f_cri:
+                f_trust_hi = 1.05 * f_trust_hi
+            elif f_unreason > max_f_cri * 2.:
+                f_trust_hi = 0.95 * f_trust_hi
     return conv,f_trust_lo,f_trust_hi
 
 def model_devi_vs_err_adjust(jdata):
@@ -1640,7 +2012,8 @@ def model_devi_vs_err_adjust(jdata):
     sys_idx_new = []
     for sys in sys_idx:
         static_infor = int(np.loadtxt(os.path.join(work_path,'static.'+train_task_fmt % sys))[-1])
-        if static_infor > patience_cut:
+        large_rmse_infor = int(np.loadtxt(os.path.join(work_path,'static.'+train_task_fmt % sys))[-2])
+        if static_infor > patience_cut or (large_rmse_infor > 2 * patience_cut - 1 and generalML == True):
             pass
         else:
             sys_idx_new.append(sys)
@@ -1669,10 +2042,17 @@ def model_devi_vs_err_adjust(jdata):
         
         #conv,f_trust_lo_sys,f_trust_hi_sys = _single_sys_adjusted(f_trust_lo_sys,f_trust_hi_sys,ii,generalML,jdata['fp_accurate_threshold'],jdata['max_f_cri'],jdata['rmse_f_cri'])
         jdata["model_devi_f_trust_lo"][ii] = f_trust_lo_sys
-        jdata["model_devi_f_trust_hi"][ii] = f_trust_hi_sys
+        if f_trust_hi_sys > 9.:
+            jdata["model_devi_f_trust_hi"][ii] = f_trust_lo_sys * 3.
+        else:
+            jdata["model_devi_f_trust_hi"][ii] = f_trust_hi_sys
         #jdata["model_devi_numb_candi_f"] = max(int(j_last_devi['nsteps']/j_last_devi['trj_freq']*jdata['fp_accurate_soft_threshold']+1), jdata['fp_task_max']*5)
         if conv == False:
             new_simul = False
+
+    if len(sys_idx_new) == 0:
+        new_simul = True
+
     if new_simul == True:
         idx_temps = len(np.where(np.array(T_list)<temps)[0])
         if generalML == True:
@@ -1751,6 +2131,7 @@ def run_iter(param_file,machine_file):
         # !!!!! add here
         # function model_devi_vs_err_adjust used to generate new trust_lo; trust hi
         # function json_gen used to add new train iter
+        # need change back later !!!!!!!!!
         if ii > iter_rec[0]:
             jdata = model_devi_vs_err_adjust(jdata)
             _json_gen(jdata,ii)
@@ -1778,8 +2159,25 @@ def run_iter(param_file,machine_file):
                 if not cont :
                     break
             elif jj == 4:
+                if ii > 0:
+                    iter_name = make_iter_name(ii-1)
+                    work_path = os.path.join(iter_name, fp_name)
+                    if os.path.isfile(os.path.join(work_path, 'md_cond')):
+                        do_md = np.loadtxt(os.path.join(work_path,'md_cond'))[0]
+                        if int(do_md) == 0:
+                            do_md = False
+                        else:
+                            do_md = True
+                    else:
+                        do_md = True
+                else:
+                    do_md = True
+                # !!!!! need modify later, now has no time to debug
                 log_iter ("run_model_devi", ii, jj)
-                run_model_devi (ii, jdata, mdata)
+                if do_md == True:
+                    run_model_devi (ii, jdata, mdata)
+                else:
+                    copy_model_devi (ii, jdata, mdata)
             elif jj == 5 :
                 log_iter ("post_model_devi", ii, jj)
                 post_model_devi (ii, jdata, mdata)
