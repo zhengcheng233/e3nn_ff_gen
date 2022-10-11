@@ -149,9 +149,14 @@ def calc_model_devi(f0,f1,f2,f3,f_name,frequency,reasons):
     devi += devi0; devi += devi0; devi = np.vstack(devi).T
     # set unreasonable structures model_devi as very large value
     unreason = False
+    reasons = np.array(reasons)
+    unreason_ratio = len(np.where(reasons[:,0] < 0.5)[0])/len(reasons)
     for idx,reason in enumerate(reasons):
         if reason[0] == 0 and reason[1] == 0:
-            unreason = True
+            if unreason_ratio < 0.05:
+                devi[idx][1:] = 1000.
+            else:
+                unreason = True
         elif reason[0] == 0 and reason[1] == 1:
             devi[idx][1:] = 1000.
         if unreason == True:
