@@ -1174,10 +1174,7 @@ def _select_by_model_devi_adaptive_trust_low(
     for tt in modd_system_task:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            if generalML == True:
-                model_devi = np.loadtxt(os.path.join(tt, 'model_devi_online.out'))
-            else:
-                model_devi = np.loadtxt(os.path.join(tt, 'model_devi.out'))
+            model_devi = np.loadtxt(os.path.join(tt, 'model_devi_online.out'))
             #!!!!! if unreasonable structres is observed, the structures behind them will be assumed as failed
             unreason = False
             for ii in range(model_devi.shape[0]):
@@ -1313,10 +1310,13 @@ def _make_fp_vasp_inner (modd_path,
 
     # we need to static the number of whole fp candidate and fp task, as if over 10,000 configs will generate much too fp tasks
     total_candi_max = 0; total_fp_max = 0; do_md = True; do_part_fp = False
-    if os.path.isfile(os.path.join(prev_path,'md_cond')):
-        last_do_md = np.loadtxt(os.path.join(prev_path,'md_cond'))[0]
-    else:
+    if prev_path == None:
         last_do_md = 1
+    else:
+        if os.path.isfile(os.path.join(prev_path,'md_cond')):
+            last_do_md = np.loadtxt(os.path.join(prev_path,'md_cond'))[0]
+        else:
+            last_do_md = 1
     for ss in system_index:
         modd_system_glob = os.path.join(modd_path, 'task.' + ss + '.*')
         modd_system_task = glob.glob(modd_system_glob)
@@ -1467,17 +1467,17 @@ def _make_fp_vasp_inner (modd_path,
             patience_num = 0
          
         f_reason = os.path.join(modd_path,'task.'+ss+'.000000','reasonable.txt')
-        reason_idxs = np.loadtxt(f_reason); unreason_ratio = len(np.where(reason_idxs<0.5)[0])/len(reason_idx)
+        reason_idxs = np.loadtxt(f_reason); unreason_ratio = len(np.where(reason_idxs<0.5)[0])/len(reason_idxs)
         # aviod unreason count from the same traj
         if last_do_md < 0.5:
             pass
         else:
-            if reason_idxs[-1] < 0.5 and unreason_ratio > 0.2:
+            if reason_idxs[-1][0] < 0.5 and unreason_ratio > 0.2:
                 unreason_num += 1
             else:
                 unreason_num = 0 
         np.savetxt(os.path.join(work_path,'static.'+ss),[len(fp_rest_accurate)/fp_sum,len(fp_candidate)/fp_sum,len(fp_rest_failed)/fp_sum,largermse_num,patience_num])
-        np.savetxt(os.path.join(work_path,'unreason.'+ss),unreason_num) 
+        np.savetxt(os.path.join(work_path,'unreason.'+ss),[unreason_num]) 
         if (numb_task < fp_task_min):
             numb_task = 0
         dlog.info("system {0:s} accurate_ratio: {1:8.4f}    thresholds: {2:6.4f} and {3:6.4f}   eff. task min and max {4:4d} {5:4d}   number of fp tasks: {6:6d}".format(ss, accurate_ratio, fp_accurate_soft_threshold, fp_accurate_threshold, fp_task_min, this_fp_task_max, numb_task))

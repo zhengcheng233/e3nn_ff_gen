@@ -46,7 +46,7 @@ def proton_transfer_check0(coord,symbol,idx_hydro,idx_0,proton_idx,bond_lengths)
     dis_ord = np.argsort(dis)[1]
     if dis_ord != idx_0 and proton_idx[dis_ord] < 0 and proton_idx[idx_0] > 0:
         sym = tuple(sorted([symbol[dis_ord],'H'])) 
-        if dis[dis_ord] > bond_lengths[sym] * bond_lo_ratio and dis[dir_ord] < bond_lengths[sym] * bond_hi_ratio:
+        if dis[dis_ord] > bond_lengths[sym] * bond_lo_ratio and dis[dis_ord] < bond_lengths[sym] * bond_hi_ratio:
             proton_pair = True
     return proton_pair
 
