@@ -546,7 +546,6 @@ def make_model_devi(iter_index,
     sys_idx = expand_idx(cur_job['sys_idx'])
     if (len(sys_idx) != len(list(set(sys_idx)))) :
         raise RuntimeError("system index should be uniq")
-    
     # add cur_dir as the directory of topo.txt and atompair_length.txt
     conf_systems = []; conf_dirs = []
     for idx in sys_idx : 
@@ -560,7 +559,6 @@ def make_model_devi(iter_index,
             f_name = os.path.basename(ii)
             cur_dir.append(ii[:-len(f_name)])
         conf_systems.append (cur_systems); conf_dirs.append(cur_dir)
-
     iter_name = make_iter_name(iter_index)
     train_path = os.path.join(iter_name, train_name)
     train_path = os.path.abspath(train_path)
@@ -845,10 +843,10 @@ def run_model_devi (iter_index,
                 forward_files = ['conf.lmp', 'e3_layer_md.py', 'traj']
                 backward_files = ['monitor.csv','model_devi.log', 'traj']
             else:
-                command = "python3 e3_layer_md.py %s %s %s %s %s" %(cur_job['temps'][-1],cur_job['nsteps']+cur_job['trj_freq'], cur_job['trj_freq'],jdata['bond_hi'],jdata['bond_lo'], str(1)) 
+                command = "python3 e3_layer_md.py %s %s %s %s %s 1" %(cur_job['temps'][-1],cur_job['nsteps']+cur_job['trj_freq'], cur_job['trj_freq'],jdata['bond_hi'],jdata['bond_lo']) 
                 command = "/bin/sh -c '%s'" % command
                 commands = [command]
-                forward_files = ['conf.lmp', 'e3_layer_md.py', 'traj', 'topy.py', 'inference.py'] 
+                forward_files = ['conf.lmp', 'e3_layer_md.py', 'traj', 'topo.py', 'inference.py', 'conf.topo', 'conf.bondlength'] 
                 backward_files = ['monitor.csv','model_devi.log','traj','traj.hdf5','f_pred0.hdf5','f_pred1.hdf5','f_pred2.hdf5','f_pred3.hdf5','traj.hdf5','reasonable.txt']
         elif xtbmd == True:
             command = "python3 xtb_md.py %s %s %s" %(cur_job['temps'][-1],(cur_job['nsteps']+cur_job['trj_freq'])/1000.,cur_job['trj_freq'])
@@ -1315,7 +1313,7 @@ def _make_fp_vasp_inner (modd_path,
 
     # we need to static the number of whole fp candidate and fp task, as if over 10,000 configs will generate much too fp tasks
     total_candi_max = 0; total_fp_max = 0; do_md = True; do_part_fp = False
-    if os.path.isfile(os.path.join(prev_path,'md_cond'):
+    if os.path.isfile(os.path.join(prev_path,'md_cond')):
         last_do_md = np.loadtxt(os.path.join(prev_path,'md_cond'))[0]
     else:
         last_do_md = 1
@@ -1406,7 +1404,7 @@ def _make_fp_vasp_inner (modd_path,
                 patience_num = 0
                 largermse_num = 0
 
-            if os.path.isfile(os.path.join(prev_path,'unreason.'+ss):
+            if os.path.isfile(os.path.join(prev_path,'unreason.'+ss)):
                 unreason_num = np.loadtxt(os.path.join(prev_path,'unreason.'+ss))
             else:
                 unreason_num = 0
@@ -2158,6 +2156,8 @@ def run_iter(param_file,machine_file):
     ii = -1
     while cont:
         ii += 1
+        if ii > 0 and jj > 3:
+            break
         iter_name=make_iter_name(ii)
         sepline(iter_name,'=')
         # !!!!! add here

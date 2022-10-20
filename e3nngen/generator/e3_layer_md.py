@@ -188,7 +188,8 @@ species_n = np.array(species_n,dtype=np.intc)
 e = np.array(0., dtype=np.single)
 lst = []
 [lst.append(dict(pos=coord[ii].reshape((len(species_n),3)),energy=e, forces = coord[ii].reshape((len(species_n),3)), species=species_n)) for ii in range(len(coord))]
-path = 'traj.hdf5'; attrs = {attrs}
+path = 'traj.hdf5'
+attrs = {'pos': ('node', '1x1o'), 'species': ('node', '1x0e'), 'energy': ('graph', '1x0e'), 'forces': ('node', '1x1o')}
 batch = Batch.from_data_list(lst, attrs)
 batch.dumpHDF5(path)
 
