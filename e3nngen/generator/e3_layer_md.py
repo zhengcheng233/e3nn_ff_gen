@@ -15,7 +15,7 @@ from e3_layers import configs
 from e3_layers.data import Batch, computeEdgeIndex
 import ase
 import os
-
+import time
 
 langevin_temperature = int(sys.argv[1]); steps = int(sys.argv[2]); output_period = int(sys.argv[3])
 bond_hi = float(sys.argv[4]); bond_lo = float(sys.argv[5]); do_md = int(sys.argv[6])
@@ -96,40 +96,40 @@ with open('conf.lmp','r') as fp:
 mol_atypes = np.array(mol_atypes,dtype=np.int64)
 mol_masses = np.array(mol_masses)
 mol_coords = np.array(mol_coords).reshape((mol_numAtoms,3,1))
-parameters = Parameters(mol_masses, mol_atypes, precision=precision, device=device)
-
-system = System(mol_numAtoms, nreplicas=1, precision=precision, device=device)
-system.set_positions(mol_coords)
-system.set_box(np.zeros((3,1)))
-system.set_velocities(maxwell_boltzmann(parameters.masses, T=langevin_temperature, replicas=1))
-
-config = configs.config_energy_force().model_config
-#config.n_dim = 32
-atom_types = torch.tensor((mol_atypes))
-forces = Myclass(config, atom_types, parameters)
-state_dict = torch.load('../best.000.pt', map_location=device)
-model_state_dict = {}
-for key, value in state_dict.items():
-    if key[:7] == 'module.':
-        key = key[7:]
-    model_state_dict[key] = value
-forces.model.load_state_dict(model_state_dict)
-
-
-langevin_gamma = 0.1
-timestep = 1
-
-integrator = Integrator(system, forces, timestep, device, gamma=langevin_gamma, T=langevin_temperature)
-wrapper = Wrapper(mol_numAtoms, None, device)
-
-logger = LogWriter(path="./", keys=('iter','ns','epot','ekin','etot','T'), name='monitor.csv')
-
-FS2NS = 1E-6
-save_period = output_period; traj = []
-
-trajectroyout = "traj.npy"
-
 if int(do_md) == 1:
+    parameters = Parameters(mol_masses, mol_atypes, precision=precision, device=device)
+
+    system = System(mol_numAtoms, nreplicas=1, precision=precision, device=device)
+    system.set_positions(mol_coords)
+    system.set_box(np.zeros((3,1)))
+    system.set_velocities(maxwell_boltzmann(parameters.masses, T=langevin_temperature, replicas=1))
+
+    config = configs.config_energy_force().model_config
+    #config.n_dim = 32
+    atom_types = torch.tensor((mol_atypes))
+    forces = Myclass(config, atom_types, parameters)
+    state_dict = torch.load('../best.000.pt', map_location=device)
+    model_state_dict = {}
+    for key, value in state_dict.items():
+        if key[:7] == 'module.':
+            key = key[7:]
+        model_state_dict[key] = value
+    forces.model.load_state_dict(model_state_dict)
+
+
+    langevin_gamma = 0.1
+    timestep = 1
+
+    integrator = Integrator(system, forces, timestep, device, gamma=langevin_gamma, T=langevin_temperature)
+    wrapper = Wrapper(mol_numAtoms, None, device)
+
+    logger = LogWriter(path="./", keys=('iter','ns','epot','ekin','etot','T'), name='monitor.csv')
+
+    FS2NS = 1E-6
+    save_period = output_period; traj = []
+
+    trajectroyout = "traj.npy"
+
     iterator = tqdm(range(1, int(steps / output_period) + 1))
     Epot = forces.compute(system.pos, system.box, system.forces)
     for i in iterator:
@@ -142,7 +142,6 @@ if int(do_md) == 1:
 
         logger.write_row({'iter':i*output_period,'ns':FS2NS*i*output_period*timestep,'epot':Epot,'ekin':Ekin,'etot':Epot+Ekin,'T':T})
 
-if int(do_md) == 1:
     coords = np.transpose(np.load('traj.npy')[0],(1,0,2))
 
 def make_lammps(ii,n_step,coord,box_latt,atype):
@@ -163,14 +162,14 @@ def make_lammps(ii,n_step,coord,box_latt,atype):
         buff.append(coord_fmt % (ii+1, atype[ii], r0[0], r0[1], r0[2]))
     return '\n'.join(buff)
 
-if os.path.isfile('./traj/file.txt'):
-    pass
-else:
-    os.system('mkdir -p traj')
-    with open('./traj/file.txt','w') as fp:
-        fp.write('created')
-
 if int(do_md) == 1:
+    if os.path.isfile('./traj/file.txt'):
+        pass
+    else:
+        os.system('mkdir -p traj')
+        with open('./traj/file.txt','w') as fp:
+            fp.write('created')
+
     for idx,coord in enumerate(coords):
         coord_cen = np.mean(coord,axis=0)
         coord = coord - coord_cen + np.array([box_latt/2., box_latt/2., box_latt/2.])
@@ -178,20 +177,24 @@ if int(do_md) == 1:
         with open('./traj/'+str(idx*output_period)+'.lammpstrj','w') as fp:
             fp.write(ret)
 
-os.system('python3 topo.py %s %s %s' %(bond_hi, bond_lo, output_period))
-atomic_n = ase.atom.atomic_numbers
-coord = np.load('traj_deepmd/set.000/coord.npy')
-type_ele = np.loadtxt('traj_deepmd/type.raw')
-type_map = lmp_map
-species_n = [atomic_n[type_map[int(u)]] for u in type_ele]
-species_n = np.array(species_n,dtype=np.intc)
-e = np.array(0., dtype=np.single)
-lst = []
-[lst.append(dict(pos=coord[ii].reshape((len(species_n),3)),energy=e, forces = coord[ii].reshape((len(species_n),3)), species=species_n)) for ii in range(len(coord))]
-path = 'traj.hdf5'
-attrs = {'pos': ('node', '1x1o'), 'species': ('node', '1x0e'), 'energy': ('graph', '1x0e'), 'forces': ('node', '1x1o')}
-batch = Batch.from_data_list(lst, attrs)
-batch.dumpHDF5(path)
+    os.system('python3 topo.py %s %s %s' %(bond_hi, bond_lo, output_period))
+    atomic_n = ase.atom.atomic_numbers
+
+    coord = np.load('traj_deepmd/set.000/coord.npy')
+    type_ele = np.loadtxt('traj_deepmd/type.raw')
+    type_map = lmp_map
+    species_n = [atomic_n[type_map[int(u)]] for u in type_ele]
+    species_n = np.array(species_n,dtype=np.intc)
+    e = np.array(0., dtype=np.single)
+    lst = []
+    [lst.append(dict(pos=coord[ii].reshape((len(species_n),3)),energy=e, forces = coord[ii].reshape((len(species_n),3)), species=species_n)) for ii in range(len(coord))]
+    path = 'traj.hdf5'
+    attrs = {'pos': ('node', '1x1o'), 'species': ('node', '1x0e'), 'energy': ('graph', '1x0e'), 'forces': ('node', '1x1o')}
+    batch = Batch.from_data_list(lst, attrs)
+    batch.dumpHDF5(path)
+else:
+    os.system('cp traj_old.hdf5 traj.hdf5')
+    os.system('cp reasonable_old.txt reasonable.txt')
 
 os.system("python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5'}\" --model_path ../best.000.pt --output_keys forces --output_path f_pred0.hdf5")
 os.system("python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5'}\" --model_path ../best.001.pt --output_keys forces --output_path f_pred1.hdf5")
@@ -249,4 +252,7 @@ with open('reasonable.txt','r') as fp:
         line = line.strip().split()
         reasons.append([int(line[0]),int(line[1])])
 calc_model_devi(f0,f1,f2,f3,'model_devi_online.out',output_period,reasons)
-
+if int(do_md) == 1:
+    os.system('rm -rf traj')
+    os.system('rm -rf traj_deepmd')
+time.sleep(0.5)
