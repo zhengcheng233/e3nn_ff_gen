@@ -7,7 +7,6 @@ iter:
         02.fp
         03.data
 1. further improve the active learning process as md explore is too expensive
-2. further improve the data transmission: done
 """
 
 import h5py
@@ -155,7 +154,7 @@ def calc_model_devi(f0,f1,f2,f3,f_name,frequency,reasons):
     unreason_ratio = len(np.where(reasons[:,0] < 0.5)[0])/len(reasons)
     for idx,reason in enumerate(reasons):
         if reason[0] == 0 and reason[1] == 0:
-            if unreason_ratio < 0.05:
+            if unreason_ratio < 0.05 or (unreason_ratio < 0.1 and reasons[-1][0] > 0.5):
                 devi[idx][1:] = 1000.
             else:
                 unreason = True
@@ -1012,7 +1011,7 @@ def post_model_devi (iter_index,
        commands = [command] 
        forward_files = ['traj']
        forward_files += ['inference.py','conf.topo','conf.bondlength','topo.py','conf.lmp']
-       backward_files = ['f_pred0.hdf5','f_pred1.hdf5','f_pred2.hdf5','f_pred3.hdf5','traj.hdf5','reasonable.txt','model_devi_online.out']
+       backward_files = ['f_pred0.hdf5','f_pred1.hdf5','f_pred2.hdf5','f_pred3.hdf5','traj.hdf5','reasonable.txt']
        cwd = os.getcwd()
        user_forward_files = mdata.get("model_devi" + "_user_forward_files",[])
        forward_files += [os.path.basename(file) for file in user_forward_files]
@@ -1077,66 +1076,6 @@ def _read_model_devi_file(
         model_devi[:,4:7] = model_devi[:,4:7] / avg_f
         np.savetxt(os.path.join(task_path, 'model_devi_avgf.out'), model_devi, fmt='%16.6e')
     return model_devi 
-
-def _select_by_model_devi_standard(
-        modd_system_task: List[str],
-        f_trust_lo : float,
-        f_trust_hi : float,
-        v_trust_lo : float,
-        v_trust_hi : float,
-        cluster_cutoff : float,
-        model_devi_skip : int = 0,
-        model_devi_f_avg_relative : bool = False,
-        detailed_report_make_fp : bool = True):
-    fp_candidate = []
-    if detailed_report_make_fp:
-        fp_rest_accurate = []
-        fp_rest_failed = []
-    cc = 0
-    counter = Counter()
-    counter['candidate'] = 0
-    counter['failed'] = 0
-    counter['accurate'] = 0
-    for tt in modd_system_task :
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            all_conf = _read_model_devi_file(tt, model_devi_f_avg_relative,generalML)
-            for ii in range(all_conf.shape[0]):
-                if all_conf[ii][0] < model_devi_skip :
-                    continue
-                cc = int(all_conf[ii][0])
-                if cluster_cutoff is None:
-                    if (all_conf[ii][1] < v_trust_hi and all_conf[ii][1] >= v_trust_lo) or \
-                       (all_conf[ii][4] < f_trust_hi and all_conf[ii][4] >= f_trust_lo) :
-                        fp_candidate.append([tt, cc])
-                        counter['candidate'] += 1
-                    elif (all_conf[ii][1] >= v_trust_hi ) or (all_conf[ii][4] >= f_trust_hi ):
-                        if detailed_report_make_fp:
-                            fp_rest_failed.append([tt, cc])
-                        counter['failed'] += 1
-                    elif (all_conf[ii][1] < v_trust_lo and all_conf[ii][4] < f_trust_lo ):
-                        if detailed_report_make_fp:
-                            fp_rest_accurate.append([tt, cc])
-                        counter['accurate'] += 1
-                    else :
-                        raise RuntimeError('md traj %s frame %d with f devi %f does not belong to either accurate, candidiate and failed, it should not happen' % (tt, ii, all_conf[ii][4]))
-                else:
-                    idx_candidate = np.where(np.logical_and(all_conf[ii][7:] < f_trust_hi, all_conf[ii][7:] >= f_trust_lo))[0]
-                    for jj in idx_candidate:
-                        fp_candidate.append([tt, cc, jj])
-                    counter['candidate'] += len(idx_candidate)
-                    idx_rest_accurate = np.where(all_conf[ii][7:] < f_trust_lo)[0]
-                    if detailed_report_make_fp:
-                        for jj in idx_rest_accurate:
-                            fp_rest_accurate.append([tt, cc, jj])
-                    counter['accurate'] += len(idx_rest_accurate)
-                    idx_rest_failed = np.where(all_conf[ii][7:] >= f_trust_hi)[0]
-                    if detailed_report_make_fp:
-                        for jj in idx_rest_failed:
-                            fp_rest_failed.append([tt, cc, jj])
-                    counter['failed'] += len(idx_rest_failed)
-
-    return fp_rest_accurate, fp_candidate, fp_rest_failed, counter
 
 def _select_by_model_devi_adaptive_trust_low(
         modd_system_task: List[str],
@@ -1256,6 +1195,317 @@ def _select_by_model_devi_adaptive_trust_low(
 
     return accur, candi, failed, counter, f_trust_lo, v_trust_lo
 
+def _make_fp_vasp_inner_loose (modd_path,
+                         work_path,
+                         prev_path,
+                         model_devi_skip,
+                         v_trust_lo,
+                         v_trust_hi,
+                         f_trust_lo,
+                         f_trust_hi,
+                         fp_task_min,
+                         fp_task_max,
+                         fp_link_files,
+                         type_map,
+                         jdata):
+    """
+    modd_path           string          path of model devi
+    work_path           string          path of fp
+    prev_path           string          path of previous fp
+    fp_task_max         int             max number of tasks
+    fp_link_files       [string]        linked files for fp, POTCAR for example
+    fp_params           map             parameters for fp
+    md_cond    recod the history of [do_md, part_fp] 
+    do_md      whether do md or not 
+    part_fp    whether only use part of candi 
+    patience_num      times of md explore conv 
+    largermse_num     times of accurate fp static
+    unreason_num      losse_cri for unreasonable topo
+    unreason_pre      whether reasonable 
+    fp_hist_idx_all   all history cand
+    fp_hist_idx_cur   present cand
+    """
+
+    modd_task = glob.glob(os.path.join(modd_path, "task.*"))
+    modd_task.sort()
+    system_index = []
+    for ii in modd_task :
+        system_index.append(os.path.basename(ii).split('.')[1])
+    set_tmp = set(system_index)
+    system_index = list(set_tmp)
+    system_index.sort()
+
+    fp_tasks = []; numb_task_all = []; fp_candidate_all = []; fp_hist_idx_all = []; fail_num_all = []
+
+    charges_recorder = [] # record charges for each fp_task, remember amons have differnt net charge
+    charges_map = jdata.get("sys_charges", [])
+
+    cluster_cutoff = jdata['cluster_cutoff'] if jdata.get('use_clusters', False) else None
+    model_devi_adapt_trust_lo = jdata.get('model_devi_adapt_trust_lo', False)
+    model_devi_f_avg_relative = jdata.get('model_devi_f_avg_relative', False)
+    model_err_adapt_trust_lo = jdata.get('model_err_adapt_trust_lo', 1e10)
+    # skip save *.out if detailed_report_make_fp is False, default is True
+    detailed_report_make_fp = jdata.get("detailed_report_make_fp", True)
+    # skip bad box criteria
+    skip_bad_box = jdata.get('fp_skip_bad_box')
+    # skip discrete structure in cluster
+    fp_cluster_vacuum = jdata.get('fp_cluster_vacuum',None)
+    generalML = jdata.get('generalML',True)
+    def _trust_limitation_check(sys_idx, lim):
+        if isinstance(lim, list):
+            sys_lim = lim[int(sys_idx)]
+        else:
+            sys_lim = lim
+        return sys_lim
+
+    fp_task_max_acc_conv = int(len(jdata['all_sys_idx'])/len(jdata['model_devi_jobs'][-1]['sys_idx'])*jdata['fp_task_max'])
+    fp_task_max_acc_conv = min(fp_task_max_acc_conv, jdata['fp_task_max_hi'])
+
+    # we need to static the number of whole fp candidate and fp task, as if over 10,000 configs will generate much too fp tasks
+    total_candi_max = 0; total_fp_max = 0; do_md = True; do_part_fp = False
+    if prev_path == None:
+        do_md = True
+    else:
+        if os.path.isfile(os.path.join(prev_path,'md_cond')):
+            do_md = np.loadtxt(os.path.join(prev_path,'md_cond'))[0]
+            if do_md < 0.5:
+                do_md = False
+            else:
+                do_md = True
+        else:
+            do_md = True
+    
+    for ss in system_index:
+        modd_system_glob = os.path.join(modd_path, 'task.' + ss + '.*')
+        modd_system_task = glob.glob(modd_system_glob)
+        modd_system_task.sort()
+
+        # convert global trust limitations to local ones
+        f_trust_lo_sys = _trust_limitation_check(ss, f_trust_lo)
+        f_trust_hi_sys = _trust_limitation_check(ss, f_trust_hi)
+        v_trust_lo_sys = _trust_limitation_check(ss, v_trust_lo)
+        v_trust_hi_sys = _trust_limitation_check(ss, v_trust_hi)
+
+        # assumed e -> v
+        numb_candi_f = jdata.get('model_devi_numb_candi_f', 10)
+        numb_candi_v = jdata.get('model_devi_numb_candi_v', 0)
+        perc_candi_f = jdata.get('model_devi_perc_candi_f', 0.)
+        perc_candi_v = jdata.get('model_devi_perc_candi_v', 0.)
+        fp_rest_accurate, fp_candidate, fp_rest_failed, counter, f_trust_lo_ad, v_trust_lo_ad \
+                =  _select_by_model_devi_adaptive_trust_low(
+                    modd_system_task,f_trust_lo_sys,
+                    f_trust_hi_sys, numb_candi_f, perc_candi_f,
+                    v_trust_hi_sys, numb_candi_v, perc_candi_v,
+                    model_devi_skip = model_devi_skip,
+                    model_devi_f_avg_relative = model_devi_f_avg_relative,
+                    generalML = generalML 
+                )
+        dlog.info("system {0:s} {1:9s} : f_trust_lo {2:6.3f}   v_trust_lo {3:6.3f}".format(ss, 'adapted', f_trust_lo_ad, v_trust_lo_ad))
+
+        # print a report 
+        if prev_path == None:
+            patience_num = 0
+            largermse_num = 0
+            unreason_num = 0
+            unreason_pre = 0 
+            fp_hist_idx_all.append([])
+        else:
+            if os.path.isfile(os.path.join(prev_path,'md_cond')):
+                if os.path.isfile(os.path.join(prev_path,str(ss)+'.fp_hist_idx')):
+                    fp_hist_idx = np.loadtxt(os.path.join(prev_path,str(ss)+'.fp_hist_idx'))
+                    if do_md == True:
+                        fp_hist_idx = []
+                else:
+                    fp_hist_idx = []
+                if isinstance(fp_hist_idx,list):
+                    fp_hist_idx_all.append(fp_hist_idx)
+                else:
+                    if len(fp_hist_idx.shape) > 0: 
+                        fp_hist_idx_all.append([int(idx) for idx in fp_hist_idx])
+                    else:
+                        fp_hist_idx_all.append([int(fp_hist_idx)])
+            else:
+                fp_hist_idx_all.append([])
+
+            prev_static_path = os.path.join(prev_path,'static.'+ss)
+            if os.path.isfile(prev_static_path):
+                prev_static = np.loadtxt(prev_static_path)
+                patience_num = int(prev_static[-1])
+                largermse_num = int(prev_static[-2])
+                # define the largermse_num, if rmse_f < rmse_f_cri_hi and conf_idx < 0.05 * conf_all
+                if os.path.isfile(os.path.join(prev_path,'data.'+ss,'static.npz')):
+                    rmse_f = np.load(os.path.join(prev_path,'data.'+ss,'static.npz'))['rmse_f']
+                    if rmse_f < jdata['rmse_f_cri_hi']:
+                        largermse_num += 1
+                    else:
+                        largermse_num = 0
+                else:
+                    if os.path.isfile(os.path.join(prev_path,'md_cond')):
+                        part_fp = np.loadtxt(os.path.join(prev_path,'md_cond'))[1]
+                        if int(part_fp) == 0:
+                            largermse_num += 1
+                    else:
+                        largermse_num += 1
+            else:
+                patience_num = 0
+                largermse_num = 0
+
+            if os.path.isfile(os.path.join(prev_path,'unreason.'+ss)):
+                unreason_num = np.loadtxt(os.path.join(prev_path,'unreason.'+ss))[0]
+                unreason_pre = np.loadtxt(os.path.join(prev_path,'unreason.'+ss))[1]
+            else:
+                unreason_num = 0
+                unreason_pre = 0
+        
+        fp_accurate_threshold = jdata.get('fp_accurate_threshold', 1)
+        fp_accurate_soft_threshold = jdata.get('fp_accurate_soft_threshold', fp_accurate_threshold)
+
+        fp_sum = sum(counter.values())
+
+        # if md explore patience_num += 1
+        if int(fp_task_max * (len(fp_rest_accurate)/fp_sum - fp_accurate_threshold) / (fp_accurate_soft_threshold - fp_accurate_threshold)) == 0:
+            patience_num += 1
+        else:
+            patience_num = 0
+        
+        # if conf_idx > 0.05 * conf_all or new temperature; largerrmse_num = 0
+        if len(jdata["model_devi_jobs"]) > 1 and jdata["model_devi_jobs"][-2]["temps"][-1] < jdata["model_devi_jobs"][-1]["temps"][-1]:
+            largermse_num = 0; patience_num = 0; unreason_num = 0
+        if len(jdata['model_devi_jobs'][-1]['sys_idx'])/len(jdata['all_sys_idx']) > 1 -  jdata["conv_ratio"]:
+            largermse_num = 0
+        
+        for cc_key, cc_value in counter.items():
+            dlog.info("system {0:s} {1:9s} : {2:6d} in {3:6d} {4:6.2f} %".format(ss, cc_key, cc_value, fp_sum, cc_value/fp_sum*100))
+        random.shuffle(fp_candidate)
+        if detailed_report_make_fp:
+            random.shuffle(fp_rest_failed)
+            random.shuffle(fp_rest_accurate)
+            with open(os.path.join(work_path,'candidate.shuffled.%s.out'%ss), 'w') as fp:
+                for ii in fp_candidate:
+                    fp.write(" ".join([str(nn) for nn in ii]) + "\n")
+            with open(os.path.join(work_path,'rest_accurate.shuffled.%s.out'%ss), 'w') as fp:
+                for ii in fp_rest_accurate:
+                    fp.write(" ".join([str(nn) for nn in ii]) + "\n")
+            with open(os.path.join(work_path,'rest_failed.shuffled.%s.out'%ss), 'w') as fp:
+                for ii in fp_rest_failed:
+                    fp.write(" ".join([str(nn) for nn in ii]) + "\n")
+        # set number of tasks
+        accurate_ratio = float(counter['accurate']) / float(fp_sum)
+        if accurate_ratio < fp_accurate_soft_threshold :
+            this_fp_task_max = max(fp_task_max, fp_task_max_acc_conv)
+        elif accurate_ratio >= fp_accurate_soft_threshold and accurate_ratio < fp_accurate_threshold:
+            this_fp_task_max = int(fp_task_max * (accurate_ratio - fp_accurate_threshold) / (fp_accurate_soft_threshold - fp_accurate_threshold))
+            # if most of the configs are converged, enlarge the fp_tasks of rest configs 
+            if this_fp_task_max > 0:
+                this_fp_task_max = int(fp_task_max_acc_conv * (accurate_ratio - fp_accurate_threshold) / (fp_accurate_soft_threshold - fp_accurate_threshold))
+        else:
+            this_fp_task_max = 0
+        numb_task = min(this_fp_task_max, len(fp_candidate))
+        
+        # !!! add candidate and fp task here
+        total_candi_max += len(fp_candidate) 
+        total_fp_max += numb_task
+        # !!! avoid too early stop md explore
+        if len(fp_rest_failed)/fp_sum > 0.005:
+            patience_num = 0
+        
+        f_reason = os.path.join(modd_path,'task.'+ss+'.000000','reasonable.txt')
+        reason_idxs = np.loadtxt(f_reason); unreason_ratio = len(np.where(reason_idxs<0.5)[0])/len(reason_idxs)
+        # aviod unreason count from the same traj
+        if do_md == False:
+            pass
+        else:
+            if reason_idxs[-1][0] < 0.5 and unreason_ratio > 0.1:
+                # record the md explore unreason times 
+                if do_md == True:
+                    unreason_num += 1
+            else:
+                unreason_num = 0 
+        if unreason_ratio > 0.001:
+            unreason_pre = 1
+        np.savetxt(os.path.join(work_path,'static.'+ss),[len(fp_rest_accurate)/fp_sum,len(fp_candidate)/fp_sum,len(fp_rest_failed)/fp_sum,largermse_num,patience_num])
+        np.savetxt(os.path.join(work_path,'unreason.'+ss),[unreason_num,unreason_pre]) 
+        if (numb_task < fp_task_min):
+            numb_task = 0
+        dlog.info("system {0:s} accurate_ratio: {1:8.4f}    thresholds: {2:6.4f} and {3:6.4f}   eff. task min and max {4:4d} {5:4d}   number of fp tasks: {6:6d}".format(ss, accurate_ratio, fp_accurate_soft_threshold, fp_accurate_threshold, fp_task_min, this_fp_task_max, numb_task))
+        numb_task_all.append(numb_task); fp_candidate_all.append(fp_candidate); fail_num_all.append(len(fp_rest_failed))
+    
+    #!!!! make fp tasks; here we need to sample part of fps if fps are too much; record the idx have chosen as the fp tasks
+    if total_fp_max > jdata['total_fp_max']:
+        do_part_fp = True
+    else:
+        do_part_fp = False
+    
+    np.savetxt(os.path.join(work_path,'md_cond'),[int(do_md),int(do_part_fp)])
+
+    numb_task_all = np.array(numb_task_all)
+    if do_part_fp == True:
+        task_ratio = jdata['total_fp_max']/total_fp_max 
+        _numb_task_all = [int(uu*task_ratio) for uu in numb_task_all]
+        #!!!!! avoid all fp_num is 0
+        if np.sum(np.array(_numb_task_all)) < jdata['total_fp_max'] * 0.5:
+            _numb_task_all = np.zeros(len(numb_task_all))
+            if len(_numb_task_all) > jdata['toal_fp_max']:
+                _idx = np.argsort(-numb_task_all)[0:jdata['total_fp_max']]
+                _numb_task_all[_idx] = 1.
+            else:
+                _numb_task_all = int(jdata['total_fp_max']/len(_numb_task_all))
+
+            for ii,uu in enumerate(numb_task_all):
+                _numb_task_all[ii] = int(min(_numb_task_all[ii],uu))
+    else:
+        _numb_task_all = numb_task_all
+    
+    for ss_idx, ss in enumerate(system_index):
+        model_devi_engine = jdata.get("model_devi_engine", "lammps")
+        count_bad_box = 0
+        count_bad_cluster = 0
+        numb_task = _numb_task_all[ss_idx]; fp_candidate = fp_candidate_all[ss_idx]; fp_hist_idx = fp_hist_idx_all[ss_idx]
+        fp_hist_idx_cur = []; cc_remain = 0 # cc_remain means the idx exclude the history candidate
+        for cc in range(numb_task) :
+            tt = fp_candidate[cc][0]
+            ii = fp_candidate[cc][1]
+            ss = os.path.basename(tt).split('.')[1]
+################################################################################################################################
+            conf_data = h5py.File(os.path.join(tt, "traj.hdf5"))
+            coord = conf_data['pos'][:]; symbol = conf_data['species'][:]; n_frame = conf_data['energy'].shape[0]
+            coord = coord.reshape(n_frame,int(len(coord)/n_frame),3); symbol = symbol.reshape(n_frame,int(len(symbol)/n_frame))
+
+            if ii in fp_hist_idx:
+                continue
+            else:
+                fp_hist_idx.append(ii)
+                fp_hist_idx_cur.append(ii)
+
+            pos = coord[ii]; sym = symbol[0]
+            job_name = os.path.join(tt, "job.json")
+            job_name = os.path.abspath(job_name)
+
+            fp_task_name = make_fp_task_name(int(ss), cc_remain)
+            fp_task_path = os.path.join(work_path, fp_task_name)
+            create_path(fp_task_path)
+            fp_tasks.append(fp_task_path)
+            if charges_map:
+                charges_recorder.append(charges_map[int(ss)])
+            cwd = os.getcwd()
+            os.chdir(fp_task_path)
+            dumpposcar(pos,sym,'POSCAR',type_map)
+            cc_remain += 1 
+            os.chdir(cwd)
+        np.savetxt(os.path.join(work_path,str(ss)+'.fp_hist_idx_cur'),fp_hist_idx_cur)
+        np.savetxt(os.path.join(work_path,str(ss)+'.fp_hist_idx'),fp_hist_idx)
+        # static the history ratio
+        cand_hist_ratio = len(fp_hist_idx)/(n_frame - fail_num_all[ss_idx])
+        np.savetxt(os.path.join(work_path,str(ss)+'.fp_hist_idx_ratio'),[cand_hist_ratio])
+        
+        if count_bad_box > 0:
+            dlog.info("system {0:s} skipped {1:6d} confs with bad box, {2:6d} remains".format(ss, count_bad_box, numb_task - count_bad_box))
+        if count_bad_cluster > 0:
+            dlog.info("system {0:s} skipped {1:6d} confs with bad cluster, {2:6d} remains".format(ss, count_bad_cluster, numb_task - count_bad_cluster))
+###################################################################################################################################
+    
+    return fp_tasks
+
 def _make_fp_vasp_inner (modd_path,
                          work_path,
                          prev_path,
@@ -1276,6 +1526,10 @@ def _make_fp_vasp_inner (modd_path,
     fp_task_max         int             max number of tasks
     fp_link_files       [string]        linked files for fp, POTCAR for example
     fp_params           map             parameters for fp
+    md_cond    recod the history of [do_md, part_fp] 
+    do_md      whether do md or not 
+    part_fp    whether only use part of candi 
+    
     """
 
     modd_task = glob.glob(os.path.join(modd_path, "task.*"))
@@ -1334,23 +1588,11 @@ def _make_fp_vasp_inner (modd_path,
         v_trust_hi_sys = _trust_limitation_check(ss, v_trust_hi)
 
         # assumed e -> v
-        if not model_devi_adapt_trust_lo:
-            fp_rest_accurate, fp_candidate, fp_rest_failed, counter \
-                =  _select_by_model_devi_standard(
-                    modd_system_task,
-                    f_trust_lo_sys, f_trust_hi_sys,
-                    v_trust_lo_sys, v_trust_hi_sys,
-                    cluster_cutoff,
-                    model_devi_skip,
-                    model_devi_f_avg_relative = model_devi_f_avg_relative,
-                    detailed_report_make_fp = detailed_report_make_fp
-                )
-        else:
-            numb_candi_f = jdata.get('model_devi_numb_candi_f', 10)
-            numb_candi_v = jdata.get('model_devi_numb_candi_v', 0)
-            perc_candi_f = jdata.get('model_devi_perc_candi_f', 0.)
-            perc_candi_v = jdata.get('model_devi_perc_candi_v', 0.)
-            fp_rest_accurate, fp_candidate, fp_rest_failed, counter, f_trust_lo_ad, v_trust_lo_ad \
+        numb_candi_f = jdata.get('model_devi_numb_candi_f', 10)
+        numb_candi_v = jdata.get('model_devi_numb_candi_v', 0)
+        perc_candi_f = jdata.get('model_devi_perc_candi_f', 0.)
+        perc_candi_v = jdata.get('model_devi_perc_candi_v', 0.)
+        fp_rest_accurate, fp_candidate, fp_rest_failed, counter, f_trust_lo_ad, v_trust_lo_ad \
                 =  _select_by_model_devi_adaptive_trust_low(
                     modd_system_task,f_trust_lo_sys,
                     f_trust_hi_sys, numb_candi_f, perc_candi_f,
@@ -1359,7 +1601,7 @@ def _make_fp_vasp_inner (modd_path,
                     model_devi_f_avg_relative = model_devi_f_avg_relative,
                     generalML = generalML 
                 )
-            dlog.info("system {0:s} {1:9s} : f_trust_lo {2:6.3f}   v_trust_lo {3:6.3f}".format(ss, 'adapted', f_trust_lo_ad, v_trust_lo_ad))
+        dlog.info("system {0:s} {1:9s} : f_trust_lo {2:6.3f}   v_trust_lo {3:6.3f}".format(ss, 'adapted', f_trust_lo_ad, v_trust_lo_ad))
 
         # print a report 
         if prev_path == None:
@@ -1477,7 +1719,7 @@ def _make_fp_vasp_inner (modd_path,
         if last_do_md < 0.5:
             pass
         else:
-            if reason_idxs[-1][0] < 0.5 and unreason_ratio > 0.2:
+            if reason_idxs[-1][0] < 0.5 and unreason_ratio > 0.1:
                 unreason_num += 1
             else:
                 unreason_num = 0 
@@ -1489,7 +1731,7 @@ def _make_fp_vasp_inner (modd_path,
         numb_task_all.append(numb_task); fp_candidate_all.append(fp_candidate)
     
     #!!!! make fp tasks; here we need to sample part of fps if fps are too much; record the idx have chosen as the fp tasks
-    if total_candi_max > jdata['total_candi_max']:
+    if total_candi_max > jdata['total_candi_min']:
         do_md = False
     else:
         do_md = True
@@ -1498,20 +1740,21 @@ def _make_fp_vasp_inner (modd_path,
     else:
         do_part_fp = False
     np.savetxt(os.path.join(work_path,'md_cond'),[int(do_md),int(do_part_fp)])
-    
+    numb_task_all = np.array(numb_task_all)
+
     if do_part_fp == True:
         task_ratio = jdata['total_fp_max']/total_fp_max 
-        _numb_task_all = [int(uu*task_ratio) for uu in num_task_all]
+        _numb_task_all = [int(uu*task_ratio) for uu in numb_task_all]
         #!!!!! avoid all fp_num is 0
         if np.sum(np.array(_numb_task_all)) < jdata['total_fp_max'] * 0.5:
-            _numb_task_all = np.zeros(len(num_task_all))
+            _numb_task_all = np.zeros(len(numb_task_all))
             if len(_numb_task_all) > jdata['toal_fp_max']:
-                _idx = np.argsort(-num_task_all)[0:jdata['total_fp_max']]
+                _idx = np.argsort(-numb_task_all)[0:jdata['total_fp_max']]
                 _numb_task_all[_idx] = 1.
             else:
                 _numb_task_all = int(jdata['total_fp_max']/len(_numb_task_all))
 
-            for ii,uu in enumerate(num_task_all):
+            for ii,uu in enumerate(numb_task_all):
                 _numb_task_all[ii] = int(min(_numb_task_all[ii],uu))
     else:
         _numb_task_all = numb_task_all
@@ -1566,7 +1809,7 @@ def _make_fp_vasp_inner (modd_path,
     if len(fp_tasks) < jdata['total_fp_max'] and len(fp_tasks) < 0.8 * np.sum(np.array(_numb_task_all)):
         do_md = True; do_part_fp = False
 
-    return fp_tasks, do_md, do_part_fp
+    return fp_tasks
 
 def _make_fp_vasp_configs(iter_index, 
                          jdata):
@@ -1594,7 +1837,8 @@ def _make_fp_vasp_configs(iter_index,
             task_min = cur_job['task_min']
 
     # make configs
-    fp_tasks, do_md, do_part_fp = _make_fp_vasp_inner(modd_path, work_path,
+    if jdata['generalML'] == True:
+        fp_tasks = _make_fp_vasp_inner(modd_path, work_path,
                                    previous_path,
                                    model_devi_skip,
                                    v_trust_lo, v_trust_hi,
@@ -1603,12 +1847,22 @@ def _make_fp_vasp_configs(iter_index,
                                    [],
                                    type_map,
                                    jdata)
-    return fp_tasks, do_md, do_part_fp
+    else:
+        fp_tasks = _make_fp_vasp_inner_loose(modd_path, work_path,
+                                   previous_path,
+                                   model_devi_skip,
+                                   v_trust_lo, v_trust_hi,
+                                   f_trust_lo, f_trust_hi,
+                                   task_min, fp_task_max,
+                                   [],
+                                   type_map,
+                                   jdata)
+    return fp_tasks
 
 def make_fp_gaussian(iter_index,
                      jdata):
-    # make config
-    fp_tasks, do_md, do_part_fp = _make_fp_vasp_configs(iter_index, jdata)
+    # obtain the fp tasks we need for the ML force field refine
+    fp_tasks = _make_fp_vasp_configs(iter_index, jdata)
     if len(fp_tasks) == 0 :
         return
     # make gaussian gjf file
@@ -1715,8 +1969,8 @@ def run_fp(iter_index,
     fp_style = jdata['fp_style']
     fp_pp_files = jdata['fp_pp_files']
     if fp_style == "gaussian":
-        forward_files = ['input.com','e3_layer_infer.py']
-        backward_files = ['output','single.npz']
+        forward_files = ['input.com']
+        backward_files = ['output']
         run_fp_inner(iter_index, jdata, mdata, forward_files, backward_files, _gaussian_check_fin, log_file = 'output')
     else:
         raise RuntimeError ("unsupported fp style")
@@ -1921,7 +2175,7 @@ def _single_sys_adjusted(f_trust_lo,f_trust_hi,ii,generalML,jdata):
         conv = True
     elif static_ratio[-2] > jdata['model_devi_patience'] -1 and np.max(model_max_f) < max_f_cri_hi:
         conv = True
-    
+     
     # adjust the trust_lo, trust_hi; need reload previous model_max_f and model_devi_f; maybe save as a file
     #if generalML == True:
     #    f_trust_hi = 100.
@@ -1976,6 +2230,123 @@ def _single_sys_adjusted(f_trust_lo,f_trust_hi,ii,generalML,jdata):
             elif f_unreason > max_f_cri * 2.:
                 f_trust_hi = 0.95 * f_trust_hi
     return conv,f_trust_lo,f_trust_hi
+
+def model_devi_vs_err_adjust_loose(jdata):
+    # need to adjust trust_lo, trust_high automaticaaly
+    # if generalML = True; need added T automatically; but nsteps and trust_lo and high using default temporaily
+    # if generalML = False, need added T, nsteps automatically, primary trust_lo and high are static using previous data infor (maybe static offline by myself using analysze script) ,
+    # moreover also determine the start and find sampling points acoording to the density of model_devi larger than trust_high
+    
+    cwd = os.getcwd()
+    j_last_devi = jdata['model_devi_jobs'][-1]; trj_freq = j_last_devi["trj_freq"] 
+    ensemble = j_last_devi['ensemble']; temps = j_last_devi["temps"][-1]; nsteps = j_last_devi["nsteps"]
+    _idx = int(j_last_devi["_idx"]); sys_idx = j_last_devi["sys_idx"]; all_sys_idx = jdata["all_sys_idx"]
+    T_list = jdata['temps_list']; f_trust_lo = jdata["model_devi_f_trust_lo"]
+    patience_cut = jdata['model_devi_patience']; e3nn_md_cut = jdata['e3nn_md_patience']
+    f_trust_hi = jdata["model_devi_f_trust_hi"]; generalML = jdata['generalML']
+    iter_name = make_iter_name(_idx)
+    work_path = os.path.join(iter_name, fp_name)
+    sys_idx_new = []; fp_accurate_threshold = jdata['fp_accurate_threshold']; fp_task_max = jdata['fp_task_max']
+    fp_accurate_soft_threshold = jdata['fp_accurate_soft_threshold']
+    
+    for sys in sys_idx:
+        static_infor = int(np.loadtxt(os.path.join(work_path,'static.'+train_task_fmt % sys))[-1])
+        large_rmse_infor = int(np.loadtxt(os.path.join(work_path,'static.'+train_task_fmt % sys))[-2])
+        # if config generate unreasonable structures five md explore and rmse is small, then assume the config itself can not converge
+        unreason_num = int(np.loadtxt(os.path.join(work_path,'unreason.'+train_task_fmt % sys))[0])
+        unreason_pre = int(np.loadtxt(os.path.join(work_path,'unreason.'+train_task_fmt % sys))[1])
+        # obatin the history fp ratio in whole traj, if too high, do not sample candi and wait for next md 
+        fp_hist_ratio = np.loadtxt(os.path.join(work_path,str(sys)+'.fp_hist_idx_ratio'))
+
+        if static_infor >= patience_cut or (large_rmse_infor >= 2 * patience_cut):
+            # if md conv or rmse is small, skip 
+            pass
+        elif (unreason_pre >= 0 and large_rmse_infor >= 2 * patience_cut) :
+            # if have unreason_num, but the candi error is small
+            pass
+        elif fp_hist_ratio > jdata['single_traj_cand_ratio']:
+            # if condi have sample enough in a traj
+            pass 
+        else:
+            sys_idx_new.append(sys)
+
+    os.chdir(work_path)
+    next_nsteps  = max(nsteps,40000)
+
+    def _trust_limitation_check(sys_idx, lim):
+        if isinstance(lim, list):
+            sys_lim = lim[int(sys_idx)]
+        else:
+            sys_lim = lim
+        return sys_lim
+    
+    do_md = np.loadtxt('md_cond')[0]
+    part_fp = np.loadtxt('md_cond')[1]
+     
+    # whether do new e3nn md simulaton 
+    if len(sys_idx_new) == 0:
+        # if no sys_idx, do new md 
+        new_simul = True
+        do_md = 1
+    else:
+        new_simul = False
+        do_md = 0
+    np.savetxt('md_cond',[do_md,part_fp])
+
+    # whether do new md at higher temperature
+    new_simul_T = True
+    
+    for ii in sys_idx:
+        f_trust_lo_sys = _trust_limitation_check(ii, f_trust_lo)
+        f_trust_hi_sys = _trust_limitation_check(ii, f_trust_hi)
+        unreason_num = int(np.loadtxt(os.path.join(work_path,'unreason.'+train_task_fmt % sys))[0])
+        # !!!!!!!! if unreason and not candi, lower the trust_lo; more over if no static.npz test the part_fp
+        if os.path.isfile(os.path.abspath('data.'+data_system_fmt%ii+'/static.npz')):  
+            conv,f_trust_lo_sys,f_trust_hi_sys = _single_sys_adjusted(f_trust_lo_sys,f_trust_hi_sys,ii,generalML,jdata)
+        else:
+            unreason_pre = int(np.loadtxt(os.path.join(work_path,'unreason.'+train_task_fmt % sys))[1])
+            f_trust_lo_sys = f_trust_lo_sys; f_trust_hi_sys = f_trust_hi_sys
+            accurate_ratio = np.loadtxt(os.path.join(work_path,'static.'+train_task_fmt % sys))[0]
+            this_fp_task_max = int(fp_task_max * (accurate_ratio - fp_accurate_threshold) / (fp_accurate_soft_threshold - fp_accurate_threshold))
+            if this_fp_task_max <= 0:
+                conv = True
+            else:
+                conv = False
+            if unreason_pre > 0 and this_fp_task_max <= 0:
+                f_trust_lo_sys = f_trust_lo_sys * 0.95
+                conv = False
+
+        jdata["model_devi_f_trust_lo"][ii] = f_trust_lo_sys
+        if f_trust_hi_sys > 9.:
+            jdata["model_devi_f_trust_hi"][ii] = f_trust_lo_sys * 3.
+        else:
+            jdata["model_devi_f_trust_hi"][ii] = f_trust_hi_sys
+        if unreason_num >= e3nn_md_cut:
+            # if md explore in a temp always have unreasonable config
+            conv = True
+        #jdata["model_devi_numb_candi_f"] = max(int(j_last_devi['nsteps']/j_last_devi['trj_freq']*jdata['fp_accurate_soft_threshold']+1), jdata['fp_task_max']*5)
+        # if not converge or only part fp are calc, than we don't do md at new condition
+        if conv == False:
+            new_simul_T = False
+
+    # generate next md simulation in json file 
+    if new_simul_T == True:
+        idx_temps = len(np.where(np.array(T_list)<temps)[0])
+        if idx_temps == len(T_list) - 1:
+            pass
+        else:
+            temps = T_list[idx_temps+1]; _idx += 1
+    
+    if _idx == len(jdata['model_devi_jobs']):
+        # new simulational condition
+        md_cond = {'_idx':data_system_fmt%_idx, "sys_idx":all_sys_idx, "temps":[temps], "press": [1], "nsteps": next_nsteps, "trj_freq": trj_freq, "ensemble":ensemble}
+        jdata['model_devi_jobs'].append(md_cond)
+    else:
+        # old simulational condition but not converged
+        jdata['model_devi_jobs'].append({'_idx':data_system_fmt%(_idx+1), "sys_idx":sys_idx_new,"temps":j_last_devi["temps"], "press":[1], "nsteps":j_last_devi["nsteps"], "trj_freq":j_last_devi["trj_freq"],"ensemble":j_last_devi["ensemble"]})
+    
+    os.chdir(cwd)
+    return jdata
 
 def model_devi_vs_err_adjust(jdata):
     # need to adjust trust_lo, trust_high automaticaaly
@@ -2123,7 +2494,10 @@ def run_iter(param_file,machine_file):
         # function json_gen used to add new train iter
         # need change back later !!!!!!!!!
         if ii > iter_rec[0]:
-            jdata = model_devi_vs_err_adjust(jdata)
+            if jdata['generalML'] == True:
+                jdata = model_devi_vs_err_adjust(jdata)
+            else:
+                jdata = model_devi_vs_err_adjust_loose(jdata)
             _json_gen(jdata,ii)
 
         for jj in range(numb_task):
@@ -2149,11 +2523,12 @@ def run_iter(param_file,machine_file):
                 if not cont :
                     break
             elif jj == 4:
+                # using previous informaton to determine do md explore or using previous traj
                 if ii > 0:
-                    iter_name = make_iter_name(ii-1)
-                    work_path = os.path.join(iter_name, fp_name)
-                    if os.path.isfile(os.path.join(work_path, 'md_cond')):
-                        do_md = np.loadtxt(os.path.join(work_path,'md_cond'))[0]
+                    prev_name = make_iter_name(ii-1)
+                    prev_work_path = os.path.join(prev_name, fp_name)
+                    if os.path.isfile(os.path.join(prev_work_path, 'md_cond')):
+                        do_md = np.loadtxt(os.path.join(prev_work_path,'md_cond'))[0]
                         if int(do_md) == 0:
                             do_md = False
                         else:

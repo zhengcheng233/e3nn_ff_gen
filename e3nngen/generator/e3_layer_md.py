@@ -230,7 +230,7 @@ def calc_model_devi(f0,f1,f2,f3,f_name,frequency,reasons):
     unreason_ratio = len(np.where(reasons[:,0] < 0.5)[0])/len(reasons)
     for idx,reason in enumerate(reasons):
         if reason[0] == 0 and reason[1] == 0:
-            if unreason_ratio < 0.05:
+            if unreason_ratio < 0.05 or (unreason_ratio < 0.1 and reasons[-1][0] > 0.5):
                 devi[idx][1:] = 1000.
             else:
                 unreason = True
@@ -255,4 +255,7 @@ calc_model_devi(f0,f1,f2,f3,'model_devi_online.out',output_period,reasons)
 if int(do_md) == 1:
     os.system('rm -rf traj')
     os.system('rm -rf traj_deepmd')
+else:
+    os.system('rm traj_old.hdf5')
+    os.system('rm reasonable_old.txt')
 time.sleep(0.5)
