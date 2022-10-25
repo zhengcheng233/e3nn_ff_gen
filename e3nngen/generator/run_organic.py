@@ -419,7 +419,7 @@ def run_train(iter_index,
             command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':%s,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.003,'metric_key':'validation_loss','early_stopping_patiences':{'training_loss':20}}\" --resume_from old/results/default_project/default/last.pt" %(train_command, n_train, n_val, max(int(n_train/10000),1),epoch_sub)
         else:
             #command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':%s,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.01,'metric_key':'validation_loss','early_stopping_patiences':{'training_loss':20}}\"" %(train_command, n_train, n_val, max(int(n_train/10000),1),epoch_sub)
-            command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':%s,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.006,'metric_key':'validation_loss','early_stopping_patiences':{'training_loss':20}}\" --resume_from old/results/default_project/default/last.pt" %(train_command, n_train, n_val, max(int(n_train/10000),1),epoch_sub)
+            command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':%s,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s, 'md':False, 'early_stopping_delta':{'training_loss':0.5},'learning_rate':0.008,'metric_key':'validation_loss','early_stopping_patiences':{'training_loss':20}}\" --resume_from old/results/default_project/default/last.pt" %(train_command, n_train, n_val, max(int(n_train/10000),1),epoch_sub)
         commands.append(command)
     else:
         raise RuntimeError("DP-GEN currently only supports for DeePMD-kit 1.x or 2.x version!" )
@@ -436,7 +436,6 @@ def run_train(iter_index,
     try:
         train_group_size = 1
         mdata['train_resources']['group_size'] = 1
-        #train_group_size = mdata['train_group_size']
     except:
         train_group_size = 1
         mdata['train_resources']['group_size'] = 1
@@ -525,7 +524,6 @@ def post_train (iter_index,
 def make_model_devi(iter_index,
                    jdata,
                    mdata) :
-    # here using dp to perfrom MD; later we also need dp 
     model_devi_engine = jdata.get('model_devi_engine', 'lammps')
     model_devi_jobs = jdata['model_devi_jobs']
     generalML = jdata.get('generalML',True)
@@ -841,13 +839,13 @@ def run_model_devi (iter_index,
         if nequipMD == True:
             if generalML == True:        
                 # this function is seldom to be used, i will modify later
-                command = "python3 e3_layer_md.py %s %s %s" %(cur_job['temps'][-1],cur_job['nsteps']+cur_job['trj_freq'], cur_job['trj_freq']) 
+                command = "python3 e3_layer_md.py %s %s %s" %(cur_job['temps'][-1],cur_job['nsteps']+cur_job['trj_freq']+5, cur_job['trj_freq']) 
                 command = "/bin/sh -c '%s'" % command
                 commands = [command]
                 forward_files = ['conf.lmp', 'e3_layer_md.py','traj']
                 backward_files = ['monitor.csv','model_devi.log','traj']
             else:
-                command = "python3 e3_layer_md.py %s %s %s %s %s 1" %(cur_job['temps'][-1],cur_job['nsteps']+cur_job['trj_freq'], cur_job['trj_freq'],jdata['bond_hi'],jdata['bond_lo']) 
+                command = "python3 e3_layer_md.py %s %s %s %s %s 1" %(cur_job['temps'][-1],cur_job['nsteps']+cur_job['trj_freq']+5, cur_job['trj_freq'],jdata['bond_hi'],jdata['bond_lo']) 
                 command = "/bin/sh -c '%s'" % command
                 commands = [command]
                 forward_files = ['conf.lmp', 'e3_layer_md.py', 'topo.py', 'inference.py', 'conf.topo', 'conf.bondlength'] 
@@ -912,7 +910,7 @@ def run_model_devi (iter_index,
 def copy_model_devi (iter_index,
                      jdata,
                      mdata) :
-    # !!!!!!! this operation can aviod too much md simulation 
+    # !!!!!!! this operation can aviod too much md simulation, only model_deviatoin calculations are needed 
     iter_name = make_iter_name(iter_index)
     work_path = os.path.join(iter_name, model_devi_name)
     assert(os.path.isdir(work_path))
@@ -931,7 +929,7 @@ def copy_model_devi (iter_index,
     command = "python3 e3_layer_md.py %s %s %s %s %s %s" %(cur_job['temps'][-1],cur_job['nsteps']+cur_job['trj_freq'], cur_job['trj_freq'],jdata['bond_hi'],jdata['bond_lo'], str(0))
     command = "/bin/sh -c '%s'" % command
     commands = [command]
-    forward_files = ['conf.lmp', 'e3_layer_md.py', 'topo.py', 'inference.py', 'conf.topo', 'conf.bondlength', 'traj_old.hdf5','reasonable_old.txt']
+    forward_files = ['conf.lmp', 'e3_layer_md.py', 'topo.py', 'inference.py', 'conf.topo', 'conf.bondlength', 'traj_old.hdf5', 'reasonable_old.txt']
     backward_files = ['model_devi.log','f_pred0.hdf5','f_pred1.hdf5','f_pred2.hdf5','f_pred3.hdf5','reasonable.txt','model_devi_online.out','traj.hdf5']
     
     cwd = os.getcwd()
@@ -1243,7 +1241,6 @@ def _make_fp_vasp_inner_loose (modd_path,
     cluster_cutoff = jdata['cluster_cutoff'] if jdata.get('use_clusters', False) else None
     model_devi_adapt_trust_lo = jdata.get('model_devi_adapt_trust_lo', False)
     model_devi_f_avg_relative = jdata.get('model_devi_f_avg_relative', False)
-    model_err_adapt_trust_lo = jdata.get('model_err_adapt_trust_lo', 1e10)
     # skip save *.out if detailed_report_make_fp is False, default is True
     detailed_report_make_fp = jdata.get("detailed_report_make_fp", True)
     # skip bad box criteria
@@ -1258,10 +1255,11 @@ def _make_fp_vasp_inner_loose (modd_path,
             sys_lim = lim
         return sys_lim
 
+    # obtain the max tasks num for each config
     fp_task_max_acc_conv = int(len(jdata['all_sys_idx'])/len(jdata['model_devi_jobs'][-1]['sys_idx'])*jdata['fp_task_max'])
     fp_task_max_acc_conv = min(fp_task_max_acc_conv, jdata['fp_task_max_hi'])
 
-    # we need to static the number of whole fp candidate and fp task, as if over 10,000 configs will generate much too fp tasks
+    # static the fp tasks, if too much, only part of them do fp 
     total_candi_max = 0; total_fp_max = 0; do_md = True; do_part_fp = False
     if prev_path == None:
         do_md = True
@@ -1410,7 +1408,7 @@ def _make_fp_vasp_inner_loose (modd_path,
             patience_num = 0
         
         f_reason = os.path.join(modd_path,'task.'+ss+'.000000','reasonable.txt')
-        reason_idxs = np.loadtxt(f_reason); unreason_ratio = len(np.where(reason_idxs<0.5)[0])/len(reason_idxs)
+        reason_idxs = np.loadtxt(f_reason); unreason_ratio = len(np.where(reason_idxs[:,0]<0.5)[0])/len(reason_idxs)
         # aviod unreason count from the same traj
         if do_md == False:
             pass
@@ -1549,7 +1547,6 @@ def _make_fp_vasp_inner (modd_path,
     cluster_cutoff = jdata['cluster_cutoff'] if jdata.get('use_clusters', False) else None
     model_devi_adapt_trust_lo = jdata.get('model_devi_adapt_trust_lo', False)
     model_devi_f_avg_relative = jdata.get('model_devi_f_avg_relative', False)
-    model_err_adapt_trust_lo = jdata.get('model_err_adapt_trust_lo', 1e10)
     # skip save *.out if detailed_report_make_fp is False, default is True
     detailed_report_make_fp = jdata.get("detailed_report_make_fp", True)
     # skip bad box criteria
@@ -1714,7 +1711,7 @@ def _make_fp_vasp_inner (modd_path,
             patience_num = 0
          
         f_reason = os.path.join(modd_path,'task.'+ss+'.000000','reasonable.txt')
-        reason_idxs = np.loadtxt(f_reason); unreason_ratio = len(np.where(reason_idxs<0.5)[0])/len(reason_idxs)
+        reason_idxs = np.loadtxt(f_reason); unreason_ratio = len(np.where(reason_idxs[:,0]<0.5)[0])/len(reason_idxs)
         # aviod unreason count from the same traj
         if last_do_md < 0.5:
             pass
@@ -2244,6 +2241,7 @@ def model_devi_vs_err_adjust_loose(jdata):
     T_list = jdata['temps_list']; f_trust_lo = jdata["model_devi_f_trust_lo"]
     patience_cut = jdata['model_devi_patience']; e3nn_md_cut = jdata['e3nn_md_patience']
     f_trust_hi = jdata["model_devi_f_trust_hi"]; generalML = jdata['generalML']
+    all_sys_idx_loose = jdata["all_sys_idx_loose"]
     iter_name = make_iter_name(_idx)
     work_path = os.path.join(iter_name, fp_name)
     sys_idx_new = []; fp_accurate_threshold = jdata['fp_accurate_threshold']; fp_task_max = jdata['fp_task_max']
@@ -2261,7 +2259,7 @@ def model_devi_vs_err_adjust_loose(jdata):
         if static_infor >= patience_cut or (large_rmse_infor >= 2 * patience_cut):
             # if md conv or rmse is small, skip 
             pass
-        elif (unreason_pre >= 0 and large_rmse_infor >= 2 * patience_cut) :
+        elif (unreason_pre > 0 and large_rmse_infor >= 2 * patience_cut) :
             # if have unreason_num, but the candi error is small
             pass
         elif fp_hist_ratio > jdata['single_traj_cand_ratio']:
@@ -2269,6 +2267,20 @@ def model_devi_vs_err_adjust_loose(jdata):
             pass 
         else:
             sys_idx_new.append(sys)
+
+    all_sys_idx_loose_new = [] 
+    for sys in all_sys_idx_loose:
+        if os.path.isfile(os.path.join(work_path,'static.'+train_task_fmt % sys)):
+            static_infor = int(np.loadtxt(os.path.join(work_path,'static.'+train_task_fmt % sys))[-1])
+            large_rmse_infor = int(np.loadtxt(os.path.join(work_path,'static.'+train_task_fmt % sys))[-2])
+            unreason_pre = int(np.loadtxt(os.path.join(work_path,'unreason.'+train_task_fmt % sys))[1])
+            if static_infor >= patience_cut or (large_rmse_infor >= 2 * patience_cut):
+                if unreason_pre > 0:
+                    all_sys_idx_loose_new.append(sys)
+                else:
+                    pass
+        else:
+            all_sys_idx_loose_new.append(sys)
 
     os.chdir(work_path)
     next_nsteps  = max(nsteps,40000)
@@ -2291,8 +2303,12 @@ def model_devi_vs_err_adjust_loose(jdata):
     else:
         new_simul = False
         do_md = 0
-    np.savetxt('md_cond',[do_md,part_fp])
+    
+    if new_simul == True:
+        sys_idx_new = all_sys_idx_loose_new
 
+    np.savetxt('md_cond',[do_md,part_fp])
+    jdata['all_sys_idx_loose'] = all_sys_idx_loose_new
     # whether do new md at higher temperature
     new_simul_T = True
     
@@ -2358,11 +2374,12 @@ def model_devi_vs_err_adjust(jdata):
     ensemble = j_last_devi['ensemble']; temps = j_last_devi["temps"][-1]; nsteps = j_last_devi["nsteps"]
     _idx = int(j_last_devi["_idx"]); sys_idx = j_last_devi["sys_idx"]; all_sys_idx = jdata["all_sys_idx"]
     T_list = jdata['temps_list']; f_trust_lo = jdata["model_devi_f_trust_lo"]
-    patience_cut = jdata['model_devi_patience']
+    patience_cut = jdata['model_devi_patience'] 
     f_trust_hi = jdata["model_devi_f_trust_hi"]; generalML = jdata['generalML']
     iter_name = make_iter_name(_idx)
     work_path = os.path.join(iter_name, fp_name)
     sys_idx_new = []
+
     for sys in sys_idx:
         static_infor = int(np.loadtxt(os.path.join(work_path,'static.'+train_task_fmt % sys))[-1])
         large_rmse_infor = int(np.loadtxt(os.path.join(work_path,'static.'+train_task_fmt % sys))[-2])
