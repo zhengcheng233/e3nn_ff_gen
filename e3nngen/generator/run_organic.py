@@ -1441,7 +1441,8 @@ def _make_fp_vasp_inner_loose (modd_path,
                 if do_md == True:
                     unreason_num += 1
             else:
-                unreason_num = 0 
+                unreason_num = 0
+            unreason_pre = 0
         if unreason_ratio > 0.001:
             unreason_pre += 1
         np.savetxt(os.path.join(work_path,'static.'+ss),[len(fp_rest_accurate)/fp_sum,len(fp_candidate)/fp_sum,len(fp_rest_failed)/fp_sum,largermse_num,patience_num])
