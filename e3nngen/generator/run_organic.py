@@ -1155,6 +1155,7 @@ def _select_by_model_devi_adaptive_trust_low(
                     if ii < model_devi.shape[0] - 2:
                         if model_devi[ii+1][idx_f] > f_trust_hi * 1.5 and model_devi[ii+2][idx_f] > f_trust_hi * 1.5:
                             unreason = True
+                    # aviod too large model_deviation cause unreasonable conforer
                     if md_f > f_trust_hi * 3:
                         unreason = True
                 if md_f > f_trust_hi or md_v > v_trust_hi or unreason == True:
@@ -2374,7 +2375,7 @@ def model_devi_vs_err_adjust_loose(jdata):
             jdata["model_devi_f_trust_hi"][ii] = f_trust_lo_sys * 3.
         else:
             jdata["model_devi_f_trust_hi"][ii] = f_trust_hi_sys
-        if unreason_num >= e3nn_md_cut:
+        if unreason_num > e3nn_md_cut:
             # if md explore in a temp have unreasonable config more than e3nn_md_cut
             conv = True
         #jdata["model_devi_numb_candi_f"] = max(int(j_last_devi['nsteps']/j_last_devi['trj_freq']*jdata['fp_accurate_soft_threshold']+1), jdata['fp_task_max']*5)
