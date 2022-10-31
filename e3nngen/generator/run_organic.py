@@ -2354,12 +2354,14 @@ def model_devi_vs_err_adjust_loose(jdata):
             unreason_pre = int(np.loadtxt('unreason.'+train_task_fmt % ii)[1])
             f_trust_lo_sys = f_trust_lo_sys; f_trust_hi_sys = f_trust_hi_sys
             accurate_ratio = np.loadtxt('static.'+train_task_fmt % ii)[0]
+            fp_candi_ratio = np.loadtxt('static.'+train_task_fmt % ii)[1]
             this_fp_task_max = int(fp_task_max * (accurate_ratio - fp_accurate_threshold) / (fp_accurate_soft_threshold - fp_accurate_threshold))
             if this_fp_task_max <= 0:
                 conv = True
             else:
                 conv = False
-            if unreason_pre > 0 and this_fp_task_max <= 0:
+            # avoid has unreasonable confor, but not candi 
+            if unreason_pre > 0 and (this_fp_task_max <= 0 or fp_candi_ratio == 0):
                 f_trust_lo_sys = f_trust_lo_sys * 0.95
                 conv = False
             
