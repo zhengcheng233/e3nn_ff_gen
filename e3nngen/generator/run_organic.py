@@ -1155,6 +1155,8 @@ def _select_by_model_devi_adaptive_trust_low(
                     if ii < model_devi.shape[0] - 2:
                         if model_devi[ii+1][idx_f] > f_trust_hi * 1.5 and model_devi[ii+2][idx_f] > f_trust_hi * 1.5:
                             unreason = True
+                    if md_f > f_trust_hi * 3:
+                        unreason = True
                 if md_f > f_trust_hi or md_v > v_trust_hi or unreason == True:
                     failed.append([tt, cc])
                 else:
@@ -1426,8 +1428,8 @@ def _make_fp_vasp_inner_loose (modd_path,
         # !!! add candidate and fp task here
         total_candi_max += len(fp_candidate) 
         total_fp_max += numb_task
-        # !!! avoid too early stop md explore
-        if len(fp_rest_failed)/fp_sum > 0.005:
+        # !!! avoid too early stop md explore (if still have fail conformer, but fp candidate only have 1 or 0, still explore)
+        if len(fp_rest_failed)/fp_sum > 0.0001 and len(fp_candidate) <= 1:
             patience_num = 0
         
         f_reason = os.path.join(modd_path,'task.'+ss+'.000000','reasonable.txt')

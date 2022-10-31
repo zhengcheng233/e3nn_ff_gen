@@ -77,12 +77,13 @@ def reasonable_judge(coord,symbol,bonds,atom_pair_lengths,proton_idx,bonds_lengt
                 elif atom_dis < bond_lo:
                     reasonable = False
                 else:
-                    if symbol[i] == 'H':
-                        reasonable = proton_transfer_check0(coord,symbol,i,j,proton_idx,atom_pair_lengths)
-                    elif symbol[j] == 'H':
-                        reasonable = proton_transfer_check0(coord,symbol,j,i,proton_idx,atom_pair_lengths)
-                    else:
-                        reasonable = False
+                    if reasonable == True:
+                        if symbol[i] == 'H':
+                            reasonable = proton_transfer_check0(coord,symbol,i,j,proton_idx,atom_pair_lengths)
+                        elif symbol[j] == 'H':
+                            reasonable = proton_transfer_check0(coord,symbol,j,i,proton_idx,atom_pair_lengths)
+                        else:
+                            reasonable = False
                 # the criteration for S should be loose; 0 means reasonable or no S; 1 means unreasonable caused by S; 
                 # 2 means unreasonable caused by other atoms
                 if reasonable == False:
@@ -101,12 +102,13 @@ def reasonable_judge(coord,symbol,bonds,atom_pair_lengths,proton_idx,bonds_lengt
                 elif atom_dis < bond_lo:
                     reasonable = False
                 else:
-                    if symbol[i] == 'H':
-                        reasonable = proton_transfer_check1(coord,symbol,i,j,proton_idx,atom_pair_lengths)      
-                    elif symbol[j] == 'H':
-                        reasonable = proton_transfer_check1(coord,symbol,j,i,proton_idx,atom_pair_lengths)
-                    else:
-                        reasonable = False
+                    if reasonable == True:
+                        if symbol[i] == 'H':
+                            reasonable = proton_transfer_check1(coord,symbol,i,j,proton_idx,atom_pair_lengths)      
+                        elif symbol[j] == 'H':
+                            reasonable = proton_transfer_check1(coord,symbol,j,i,proton_idx,atom_pair_lengths)
+                        else:
+                            reasonable = False
                 if reasonable == False:
                     if ((symbol[i] == 'S' and symbol[j] != 'H') or (symbol[i] != 'H' and symbol[j] == 'S')) and cri_loose < 2:
                         cri_loose = 1
