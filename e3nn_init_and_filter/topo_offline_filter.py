@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
 filt the unreasonable conformations according the configuration topo
+need combine with the data_filter.py
 """
 import sys
 import numpy as np
