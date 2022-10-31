@@ -1150,9 +1150,11 @@ def _select_by_model_devi_adaptive_trust_low(
                 md_f = model_devi[ii][idx_f]
                 if md_f > 900.:
                     unreason = True
-                # if model_devi_f is too high, the next structure is unbelievable
+                # if model_devi_f is frequently too high, the remain structure is unbelievable
                 if generalML == False and md_f > f_trust_hi * 1.5 and md_f < 500.:
-                    unreason = True
+                    if ii < model_devi.shape[0] - 2:
+                        if model_devi[ii+1][idx_f] > f_trust_hi * 1.5 and model_devi[ii+2][idx_f] > f_trust_hi * 1.5:
+                            unreason = True
                 if md_f > f_trust_hi or md_v > v_trust_hi or unreason == True:
                     failed.append([tt, cc])
                 else:
@@ -1441,7 +1443,7 @@ def _make_fp_vasp_inner_loose (modd_path,
             else:
                 unreason_num = 0 
         if unreason_ratio > 0.001:
-            unreason_pre = 1
+            unreason_pre += 1
         np.savetxt(os.path.join(work_path,'static.'+ss),[len(fp_rest_accurate)/fp_sum,len(fp_candidate)/fp_sum,len(fp_rest_failed)/fp_sum,largermse_num,patience_num])
         np.savetxt(os.path.join(work_path,'unreason.'+ss),[unreason_num,unreason_pre]) 
         if (numb_task < fp_task_min):
@@ -2286,6 +2288,9 @@ def model_devi_vs_err_adjust_loose(jdata):
         elif (unreason_pre > 0 and large_rmse_infor > 2 * patience_cut) :
             # if have unreason_num, but the candi error is small
             pass
+        # if a traj have unreasonable structures, and have sample candidate more than e3nn_md_cut, we don't sample this traj
+        elif unreason_pre > e3nn_md_cut:
+            pass
         elif fp_hist_ratio > jdata['single_traj_cand_ratio']:
             # if condi have sample enough in a traj
             pass 
@@ -2299,6 +2304,7 @@ def model_devi_vs_err_adjust_loose(jdata):
             large_rmse_infor = int(np.loadtxt(os.path.join(work_path,'static.'+train_task_fmt % sys))[-2])
             unreason_pre = int(np.loadtxt(os.path.join(work_path,'unreason.'+train_task_fmt % sys))[1])
             if static_infor >= patience_cut or (large_rmse_infor > 2 * patience_cut):
+                # if a traj have unreasonable structures, md simulation must perform
                 if unreason_pre > 0:
                     all_sys_idx_loose_new.append(sys)
                 else:
@@ -2364,7 +2370,7 @@ def model_devi_vs_err_adjust_loose(jdata):
         else:
             jdata["model_devi_f_trust_hi"][ii] = f_trust_hi_sys
         if unreason_num >= e3nn_md_cut:
-            # if md explore in a temp always have unreasonable config
+            # if md explore in a temp have unreasonable config more than e3nn_md_cut
             conv = True
         #jdata["model_devi_numb_candi_f"] = max(int(j_last_devi['nsteps']/j_last_devi['trj_freq']*jdata['fp_accurate_soft_threshold']+1), jdata['fp_task_max']*5)
         # if not converge or only part fp are calc, than we don't do md at new condition
