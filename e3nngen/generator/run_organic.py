@@ -161,7 +161,14 @@ def calc_model_devi(f0,f1,f2,f3,f_name,frequency,reasons):
         elif reason[0] == 0 and reason[1] == 1:
             devi[idx][1:] = 1000.
         if unreason == True:
-            devi[idx][1:] = 1000.
+            if reason[0] == 0 or idx > len(reasons) - 3 or idx < 3:
+                devi[idx][1:] = 1000.
+            else:
+                if reasons[idx-1][0] > 0.5 and reasons[idx-2][0] > 0.5 and reasons[idx+1][0] > 0.5 and reasons[idx+2][0] > 0.5:
+                    pass
+                else:
+                    devi[idx][1:] = 1000.
+
     write_model_devi_out(devi,f_name)
     return 
 
@@ -2200,7 +2207,7 @@ def _single_sys_adjusted(f_trust_lo,f_trust_hi,ii,generalML,jdata):
     conv = False
     if static_ratio[0] > conver_cri or this_fp_task_max == 0:
         conv = True
-    elif static_ratio[-2] > jdata['model_devi_patience'] * 2 and np.max(model_max_f) < max_f_cri_hi:
+    elif static_ratio[-2] > jdata['model_devi_patience'] * 2 and np.max(model_max_f) < max_f_cri_hi and static_ratio[2] < 0.01:
         conv = True
      
     # adjust the trust_lo, trust_hi; need reload previous model_max_f and model_devi_f; maybe save as a file
@@ -2293,7 +2300,7 @@ def model_devi_vs_err_adjust_loose(jdata):
             # if have unreason_num, but the candi error is small
             pass
         # if a traj have unreasonable structures, and have sample candidate more than e3nn_md_cut, we don't sample this traj
-        elif unreason_pre > e3nn_md_cut:
+        elif unreason_pre >= e3nn_md_cut:
             pass
         elif fp_hist_ratio > jdata['single_traj_cand_ratio']:
             # if condi have sample enough in a traj
@@ -2373,6 +2380,8 @@ def model_devi_vs_err_adjust_loose(jdata):
         jdata["model_devi_f_trust_lo"][ii] = f_trust_lo_sys
         if f_trust_hi_sys > 9.:
             jdata["model_devi_f_trust_hi"][ii] = f_trust_lo_sys * 3.
+        elif f_trust_hi_sys < f_trust_lo_sys * 1.5:
+            jdata["model_devi_f_trust_hi"][ii] = f_trust_lo_sys * 1.5
         else:
             jdata["model_devi_f_trust_hi"][ii] = f_trust_hi_sys
         if unreason_num > e3nn_md_cut:

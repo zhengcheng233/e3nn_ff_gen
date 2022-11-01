@@ -237,7 +237,14 @@ def calc_model_devi(f0,f1,f2,f3,f_name,frequency,reasons):
         elif reason[0] == 0 and reason[1] == 1:
             devi[idx][1:] = 1000. 
         if unreason == True:
-            devi[idx][1:] = 1000.
+            # we can beleve the unreaon judge, so if nearby are reasonabel, it is reasonable
+            if reason[0] == 0 or idx > len(reasons) - 3 or idx < 3:
+                devi[idx][1:] = 1000.
+            else:
+                if reasons[idx-1][0] > 0.5 and reasons[idx-2][0] > 0.5 and reasons[idx+1][0] > 0.5 and reasons[idx+2][0] > 0.5:
+                    pass
+                else:
+                    devi[idx][1:] = 1000.
     write_model_devi_out(devi,f_name)
     return
 
