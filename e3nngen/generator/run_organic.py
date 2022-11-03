@@ -1155,16 +1155,17 @@ def _select_by_model_devi_adaptive_trust_low(
                 # cc: time step of the frame
                 md_v = model_devi[ii][idx_v]
                 md_f = model_devi[ii][idx_f]
-                if md_f > 900.:
-                    unreason = True
                 # if model_devi_f is frequently too high, the remain structure is unbelievable
                 if generalML == False and md_f > f_trust_hi * 1.5 and md_f < 500.:
                     if ii < model_devi.shape[0] - 2:
-                        if model_devi[ii+1][idx_f] > f_trust_hi * 1.5 and model_devi[ii+2][idx_f] > f_trust_hi * 1.5:
+                        if model_devi[ii+1][idx_f] > f_trust_hi * 1.5 and model_devi[ii+2][idx_f] > f_trust_hi * 1.5 and model_devi[ii+1][idx_f] < 500. \
+                           and model_devi[ii+2][idx_f] < 500.:
                             unreason = True
                     # aviod too large model_deviation cause unreasonable conforer
-                    if md_f > f_trust_hi * 3:
+                    if md_f > f_trust_hi * 3 and md_f < 500.:
                         unreason = True
+                if md_f < f_trust_lo:
+                    unreason = False
                 if md_f > f_trust_hi or md_v > v_trust_hi or unreason == True:
                     failed.append([tt, cc])
                 else:
