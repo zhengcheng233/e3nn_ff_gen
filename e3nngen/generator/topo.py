@@ -12,6 +12,7 @@ import dpdata
 bond_hi_ratio = float(sys.argv[1])
 bond_lo_ratio = float(sys.argv[2])
 trj_freq = int(sys.argv[3])
+theory_n_frame = int(sys.argv[4])
 
 def topo_bond(num_atom):
     bonds = []; atom_pair_lengths = {}; proton_idx = [0]*num_atom
@@ -46,7 +47,7 @@ def proton_transfer_check0(coord,symbol,idx_hydro,idx_0,proton_idx,bond_lengths)
     dis_ord = np.argsort(dis)[1]
     if dis_ord != idx_0 and proton_idx[dis_ord] < 0 and proton_idx[idx_0] > 0:
         sym = tuple(sorted([symbol[dis_ord],'H'])) 
-        if dis[dis_ord] > bond_lengths[sym] * bond_lo_ratio and dis[dis_ord] < bond_lengths[sym] * bond_hi_ratio:
+        if dis[dis_ord] > bond_lengths[sym] * bond_lo_ratio and dis[dis_ord] < bond_lengths[sym] * (bond_hi_ratio + 0.05):
             proton_pair = True
     return proton_pair
 
@@ -144,32 +145,38 @@ n_lammps_files = len(glob('./traj/*.lammpstrj'))
 
 reasons = []
 with open('reasonable.txt','w') as fp:
-    for ii in range(n_lammps_files):
-        f_name = str(ii * trj_freq)+'.lammpstrj'
-        coord = lammpsread('./traj/'+f_name)
-        reasonable, cri_loose = reasonable_judge(coord,symbol,bonds,atom_pair_lengths,proton_idx,bonds_lengths)
-        if reasonable == True:
-            reasons.append(1)
-            # reasonable
-            fp.write('1 1'+'\n')
-        else:
-            reasons.append(0)
-            if cri_loose == 1:
-                # loose reasonable
-                fp.write('0 1'+'\n')
+    for ii in range(theory_n_frame):
+        if ii < n_lammps_files:
+            f_name = str(ii * trj_freq)+'.lammpstrj'
+            coord = lammpsread('./traj/'+f_name)
+            reasonable, cri_loose = reasonable_judge(coord,symbol,bonds,atom_pair_lengths,proton_idx,bonds_lengths)
+            if reasonable == True:
+                reasons.append(1)
+                # reasonable
+                fp.write('1 1'+'\n')
             else:
-                # unreasonable
-                fp.write('0 0'+'\n')
-
-for ii in range(n_lammps_files):
-    f_name = str(ii * trj_freq)+'.lammpstrj'
-    if ii == 0:
-        system = dpdata.System('./traj/'+str(f_name),fmt='dump',type_map=type_map_0[1:])
-    else:
-        if reasons[ii] == 1:
-            system.append(dpdata.System('./traj/'+str(f_name),fmt='dump',type_map=type_map_0[1:]))
+                reasons.append(0)
+                if cri_loose == 1:
+                    # loose reasonable
+                    fp.write('0 1'+'\n')
+                else:
+                    # unreasonable
+                    fp.write('0 0'+'\n')
         else:
-            system.append(dpdata.System('./traj/0.lammpstrj',fmt='dump',type_map=type_map_0[1:]))
+            fp.write('0 0'+'\n')
+    
+for ii in range(theory_n_frame):
+    if ii < n_lammps_files:
+        f_name = str(ii * trj_freq)+'.lammpstrj'
+        if ii == 0:
+            system = dpdata.System('./traj/'+str(f_name),fmt='dump',type_map=type_map_0[1:])
+        else:
+            if reasons[ii] == 1:
+                system.append(dpdata.System('./traj/'+str(f_name),fmt='dump',type_map=type_map_0[1:]))
+            else:
+                system.append(dpdata.System('./traj/0.lammpstrj',fmt='dump',type_map=type_map_0[1:]))
+    else:
+        system.append(dpdata.System('./traj/0.lammpstrj',fmt='dump',type_map=type_map_0[1:]))
 
 system.nopbc = True
 system.to_deepmd_npy('traj_deepmd')

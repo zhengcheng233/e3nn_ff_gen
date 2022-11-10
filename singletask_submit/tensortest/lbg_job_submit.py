@@ -30,8 +30,12 @@ def run_e3nn(mdata,prefix,tensor_name):
     all_tasks.append(task_path)
     commands.append(train_command)
     forward_files = ['train.py']
-    forward_files += [os.path.join(prefix,prefix+'_'+tensor_name)]
+    forward_files += [prefix+'_'+tensor_name]
     backward_files = ['results']
+    if os.path.isfile(os.path.join(task_path,'train.py')):
+        pass
+    else:
+        os.symlink(os.path.abspath(os.path.join(work_path,'train.py')),os.path.abspath(os.path.join(task_path,'train.py')))
     submission = make_submission(
           train_machine,
           train_resources,

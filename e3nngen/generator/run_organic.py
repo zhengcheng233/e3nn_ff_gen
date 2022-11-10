@@ -1024,10 +1024,10 @@ def post_model_devi (iter_index,
        # get models
        all_models = glob.glob(os.path.join(work_path, "best*pt"))
        model_names = [os.path.basename(ii) for ii in all_models]
-       trj_freq = cur_job.get("trj_freq",10); n_frames = int(cur_job.get("nsteps",1000)/trj_freq)+1
+       trj_freq = cur_job.get("trj_freq",10); n_frames = int(cur_job.get("nsteps",1000)/trj_freq) + 1
        attrs =  {'pos':('node','1x1o'),'species': ('node','1x0e'), 'energy': ('graph', '1x0e'), 'forces': ('node', '1x1o')}
        
-       command = "python3 topo.py %s %s %s" %(jdata["bond_hi"],jdata["bond_lo"],trj_freq) 
+       command = "python3 topo.py %s %s %s %s" %(jdata["bond_hi"],jdata["bond_lo"],trj_freq, n_frames) 
        command += f"&& python3 -c \"import numpy as np; from e3_layers.data import Batch; import ase; atomic_n = ase.atom.atomic_numbers; coord = np.load('traj_deepmd/set.000/coord.npy'); coord = np.array(coord,dtype=np.single); type = np.loadtxt('traj_deepmd/type.raw'); type_map = {type_map}; species_n = [atomic_n[type_map[int(u)]] for u in type]; species_n = np.array(species_n,dtype=np.intc); e = np.array(0., dtype=np.single); lst = []; [lst.append(dict(pos=coord[ii].reshape((len(species_n),3)),energy=e, forces = coord[ii].reshape((len(species_n),3)), species=species_n)) for ii in range(len(coord))]; path = 'traj.hdf5'; attrs = {attrs}; batch = Batch.from_data_list(lst, attrs); batch.dumpHDF5(path)\""
        command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5'}\" --model_path ../best.000.pt --output_keys forces --output_path f_pred0.hdf5" 
        command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5'}\" --model_path ../best.001.pt --output_keys forces --output_path f_pred1.hdf5"
@@ -1375,7 +1375,9 @@ def _make_fp_vasp_inner_loose (modd_path,
                     if os.path.isfile(os.path.join(prev_path,'md_cond')):
                         part_fp = np.loadtxt(os.path.join(prev_path,'md_cond'))[1]
                         if int(part_fp) == 0:
-                            largermse_num += 1
+                            # aviod too many unreasonable
+                            if float(prev_static[0]) > 0.98:
+                                largermse_num += 1
                     else:
                         largermse_num += 1
             else:
@@ -1447,7 +1449,7 @@ def _make_fp_vasp_inner_loose (modd_path,
         if do_md == False:
             pass
         else:
-            if reason_idxs[-1][0] < 0.5 and unreason_ratio > 0.1:
+            if unreason_ratio > 0.1:
                 # record the md explore unreason times 
                 if do_md == True:
                     unreason_num += 1
@@ -2279,7 +2281,7 @@ def model_devi_vs_err_adjust_loose(jdata):
     T_list = jdata['temps_list']; f_trust_lo = jdata["model_devi_f_trust_lo"]
     patience_cut = jdata['model_devi_patience']; e3nn_md_cut = jdata['e3nn_md_patience']
     f_trust_hi = jdata["model_devi_f_trust_hi"]; generalML = jdata['generalML']
-    all_sys_idx_loose = jdata["all_sys_idx_loose"]
+    all_sys_idx_loose = jdata["all_sys_idx_loose"]; md_num = jdata['md_num']
     iter_name = make_iter_name(_idx)
     work_path = os.path.join(iter_name, fp_name)
     sys_idx_new = []; fp_accurate_threshold = jdata['fp_accurate_threshold']; fp_task_max = jdata['fp_task_max']
@@ -2350,6 +2352,7 @@ def model_devi_vs_err_adjust_loose(jdata):
     
     if new_simul == True:
         sys_idx_new = all_sys_idx_loose_new
+        md_num += 1
 
     jdata['all_sys_idx_loose'] = all_sys_idx_loose_new
     # whether do new md at higher temperature
@@ -2358,7 +2361,7 @@ def model_devi_vs_err_adjust_loose(jdata):
     for ii in sys_idx:
         f_trust_lo_sys = _trust_limitation_check(ii, f_trust_lo)
         f_trust_hi_sys = _trust_limitation_check(ii, f_trust_hi)
-        unreason_num = int(np.loadtxt('unreason.'+train_task_fmt % ii)[0])
+        unreason_pre = int(np.loadtxt('unreason.'+train_task_fmt % ii)[1])
         # !!!!!!!! if unreason and not candi, lower the trust_lo; more over if no static.npz test the part_fp
         if os.path.isfile(os.path.abspath('data.'+data_system_fmt%ii+'/static.npz')):  
             conv,f_trust_lo_sys,f_trust_hi_sys = _single_sys_adjusted(f_trust_lo_sys,f_trust_hi_sys,ii,generalML,jdata)
@@ -2372,11 +2375,12 @@ def model_devi_vs_err_adjust_loose(jdata):
                 conv = True
             else:
                 conv = False
+            
             # avoid has unreasonable confor, but not candi 
             if unreason_pre > 0 and (this_fp_task_max <= 0 or fp_candi_ratio == 0):
-                f_trust_lo_sys = f_trust_lo_sys * 0.95
-                conv = False
-            
+                if unreason_pre <= e3nn_md_cut:
+                    f_trust_lo_sys = f_trust_lo_sys * 0.95
+                conv = False 
 
         jdata["model_devi_f_trust_lo"][ii] = f_trust_lo_sys
         if f_trust_hi_sys > 9.:
@@ -2385,13 +2389,21 @@ def model_devi_vs_err_adjust_loose(jdata):
             jdata["model_devi_f_trust_hi"][ii] = f_trust_lo_sys * 1.5
         else:
             jdata["model_devi_f_trust_hi"][ii] = f_trust_hi_sys
-        if unreason_num > e3nn_md_cut:
-            # if md explore in a temp have unreasonable config more than e3nn_md_cut
-            conv = True
+        
         #jdata["model_devi_numb_candi_f"] = max(int(j_last_devi['nsteps']/j_last_devi['trj_freq']*jdata['fp_accurate_soft_threshold']+1), jdata['fp_task_max']*5)
         # if not converge or only part fp are calc, than we don't do md at new condition
         if conv == False:
             new_simul_T = False
+    
+    # if md exploare in a temp have more than e3nn_md_cut and caused by unreasonable config, don't do md
+    if len(all_sys_idx_loose_new) > 0:
+        if md_num > e3nn_md_cut:
+            pass
+        else:
+            new_simul_T = False
+    if md_num > e3nn_md_cut * 2 and do_md > 0.5:
+        new_simul_T = True
+
     if new_simul_T == True:
         do_md = 1
     np.savetxt('md_cond',[do_md,part_fp])
@@ -2403,6 +2415,9 @@ def model_devi_vs_err_adjust_loose(jdata):
             pass
         else:
             temps = T_list[idx_temps+1]; _idx += 1
+        md_num = 0
+
+    jdata['md_num'] = md_num
     
     if _idx == len(jdata['model_devi_jobs']):
         # new simulational condition

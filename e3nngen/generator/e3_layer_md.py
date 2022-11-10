@@ -19,6 +19,7 @@ import time
 
 langevin_temperature = int(sys.argv[1]); steps = int(sys.argv[2]); output_period = int(sys.argv[3])
 bond_hi = float(sys.argv[4]); bond_lo = float(sys.argv[5]); do_md = int(sys.argv[6])
+n_config = int(steps/output_period)
 
 class Parameters:
     def __init__(self, masses, mapped_atom_type, precision=torch.float, device="cpu"):
@@ -132,15 +133,18 @@ if int(do_md) == 1:
 
     iterator = tqdm(range(1, int(steps / output_period) + 1))
     Epot = forces.compute(system.pos, system.box, system.forces)
-    for i in iterator:
-        Ekin, Epot, T = integrator.step(niter=output_period)
-        wrapper.wrap(system.pos, system.box)
-        currpos = system.pos.detach().cpu().numpy().copy()
-        traj.append(currpos)
-        if (i*output_period) % save_period == 0:
-            np.save(trajectroyout, np.stack(traj, axis=2))
-
-        logger.write_row({'iter':i*output_period,'ns':FS2NS*i*output_period*timestep,'epot':Epot,'ekin':Ekin,'etot':Epot+Ekin,'T':T})
+    try:
+        for i in iterator:
+            Ekin, Epot, T = integrator.step(niter=output_period)
+            wrapper.wrap(system.pos, system.box)
+            currpos = system.pos.detach().cpu().numpy().copy()
+            traj.append(currpos)
+            if (i*output_period) % save_period == 0:
+                np.save(trajectroyout, np.stack(traj, axis=2))
+    
+            logger.write_row({'iter':i*output_period,'ns':FS2NS*i*output_period*timestep,'epot':Epot,'ekin':Ekin,'etot':Epot+Ekin,'T':T})
+    except:
+        pass
 
     coords = np.transpose(np.load('traj.npy')[0],(1,0,2))
 
@@ -177,7 +181,7 @@ if int(do_md) == 1:
         with open('./traj/'+str(idx*output_period)+'.lammpstrj','w') as fp:
             fp.write(ret)
 
-    os.system('python3 topo.py %s %s %s' %(bond_hi, bond_lo, output_period))
+    os.system('python3 topo.py %s %s %s %s' %(bond_hi, bond_lo, output_period, n_config))
     atomic_n = ase.atom.atomic_numbers
 
     coord = np.load('traj_deepmd/set.000/coord.npy')
@@ -241,7 +245,7 @@ def calc_model_devi(f0,f1,f2,f3,f_name,frequency,reasons):
             if reason[0] == 0 or idx > len(reasons) - 3 or idx < 3:
                 devi[idx][1:] = 1000.
             else:
-                if reasons[idx-1][0] > 0.5 and reasons[idx-2][0] > 0.5 and reasons[idx+1][0] > 0.5 and reasons[idx+2][0] > 0.5:
+                if reasons[idx-1][0] > 0.5:
                     pass
                 else:
                     devi[idx][1:] = 1000.
