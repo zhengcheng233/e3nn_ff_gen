@@ -2409,12 +2409,12 @@ def model_devi_vs_err_adjust_loose(jdata):
     np.savetxt('md_cond',[do_md,part_fp])
     # generate next md simulation in json file 
     if new_simul_T == True:
-        jdata['all_sys_idx_loose'] = all_sys_idx
         idx_temps = len(np.where(np.array(T_list)<temps)[0])
         if idx_temps == len(T_list) - 1:
             pass
         else:
             temps = T_list[idx_temps+1]; _idx += 1
+            jdata['all_sys_idx_loose'] = all_sys_idx
         md_num = 0
 
     jdata['md_num'] = md_num
