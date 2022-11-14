@@ -1,0 +1,2123 @@
+
+ Primary working directories    : /tmp/44012/molpro.rGFIq9K5pX
+ Secondary working directories  : /tmp/44012/molpro.rGFIq9K5pX
+ Wavefunction directory         : /share/home/kuangy/wfu/
+ Main file repository           : /tmp/44012/molpro.rGFIq9K5pX/
+
+ id        : qhszyk
+
+ Nodes     nprocs
+ cn1202       2
+
+ Using customized tuning parameters: mindgm=1; mindgv=20; mindgc=4; mindgr=1; noblas=0; minvec=7
+ default implementation of scratch files=sf  
+
+
+ Variables initialized (934), CPU time= 0.00 sec
+ memory,1.4,G
+ gdirect; gthresh,energy=1.d-8,orbital=1.d-8,grid=1.d-8
+ spherical
+ angstrom
+ symmetry,nosym
+ orient,noorient
+ geometry={
+ 1,Ne,,0.0,0.0,0.0
+ 2,Ar,,0.0,0.0,6.5
+ 3,He,,0.0,0.0,3.25
+ }
+ basis={
+ set,orbital
+ default=avtz                                                                    !for orbitals
+ s,He,even,nprim=5,ratio=2.5,center=0.5
+ p,He,even,nprim=5,ratio=2.5,center=0.5
+ d,He,even,nprim=3,ratio=2.5,center=0.3
+ f,He,even,nprim=2,ratio=2.5,center=0.3
+ set,jkfit
+ default=avtz/jkfit                                                              !for JK integrals
+ s,He,even,nprim=5,ratio=2.5,center=0.5
+ p,He,even,nprim=5,ratio=2.5,center=0.5
+ d,He,even,nprim=3,ratio=2.5,center=0.3
+ f,He,even,nprim=2,ratio=2.5,center=0.3
+ set,mp2fit
+ default=avtz/mp2fit                                                             !for E2disp/E2exch-disp
+ s,He,even,nprim=5,ratio=2.5,center=0.5
+ p,He,even,nprim=5,ratio=2.5,center=0.5
+ d,He,even,nprim=3,ratio=2.5,center=0.3
+ f,He,even,nprim=2,ratio=2.5,center=0.3
+ set,dflhf
+ default=avtz/jkfit                                                              !for LHF
+ s,He,even,nprim=5,ratio=2.5,center=0.5
+ p,He,even,nprim=5,ratio=2.5,center=0.5
+ d,He,even,nprim=3,ratio=2.5,center=0.3
+ f,He,even,nprim=2,ratio=2.5,center=0.3
+ }
+ 
+                                                            !=========delta(HF) contribution for higher order interaction terms====
+ ca=2101.2; cb=2102.2                                                            !sapt files
+ 
+                                                                                 !dimer
+ dummy,3
+ {df-hf,basis=jkfit,locorb=0}
+ edm=energy
+ 
+                                                                                 !monomer A
+ dummy,2,3
+ {df-hf,basis=jkfit,locorb=0; save,$ca}
+ ema=energy
+ {sapt;monomerA}
+ 
+                                                                                 !monomer B
+ dummy,1,3
+ {df-hf,basis=jkfit,locorb=0; save,$cb}
+ emb=energy
+ {sapt;monomerB}
+ 
+                                                                                 !interaction contributions
+ {sapt,SAPT_LEVEL=2;intermol,ca=$ca,cb=$cb,icpks=1,fitlevel=3
+ dfit,basis_coul=jkfit,basis_exch=jkfit,cfit_scf=3}
+ 
+                                                                  !calculate high-order terms by subtracting 1st+2nd order energies
+ eint_hf=(edm-ema-emb)*1000 mH
+ delta_hf=eint_hf-e1pol-e1ex-e2ind-e2exind
+ 
+                                                               !=========DFT-SAPT at second order intermol. perturbation theory====
+ ca=2103.2; cb=2104.2                                                            !sapt files;
+ 
+                                                                                 !shifts for asymptotic correction to xc potential
+ eps_homo_pbe0_B=-0.440936                                                       !HOMO(B)/PBE0 functional
+ eps_homo_pbe0_A=-0.589207                                                       !HOMO(A)/PBE0
+ ip_B=0.5792                                                                     !exp. ionisation potential
+ ip_A=0.7925                                                                     !exp. ionisation potential
+ shift_B=ip_B+eps_homo_pbe0_B                                                    !shift for bulk xc potential (B)
+ shift_A=ip_A+eps_homo_pbe0_A                                                    !shift for bulk xc potential (A)
+ 
+                                                                                 !monomer A, perform LPBE0AC calculation
+ dummy,2,3
+ {df-ks,pbex,pw91c,lhf,df_basis=jkfit; dftfac,0.75,1.0,0.25; asymp,shift_A; save,$ca}
+ {sapt;monomerA}
+ 
+                                                                                 !monomer B, perform LPBE0AC calculation
+ dummy,1,3
+ {df-ks,pbex,pw91c,lhf,df_basis=jkfit; dftfac,0.75,1.0,0.25; start,atdens; asymp,shift_B; save,$cb}
+ {sapt;monomerB}
+ 
+                                                                                 !interaction contributions
+ {sapt,SAPT_LEVEL=3;intermol,ca=$ca,cb=$cb,icpks=0,fitlevel=3,nlexfac=0.0
+ dfit,basis_coul=jkfit,basis_exch=jkfit,basis_mp2=mp2fit,cfit_scf=3}
+ 
+                                                               !add high-order approximation to obtain the total interaction energy
+ eint_dftsapt=e12tot+delta_hf
+ 
+ Commands  initialized (763), CPU time= 0.01 sec, 617 directives.
+ Default parameters read. Elapsed time= 0.07 sec
+
+ Checking input...
+ Passed
+1
+
+
+                                         ***  PROGRAM SYSTEM MOLPRO  ***
+                                       Copyright, TTI GmbH Stuttgart, 2015
+                                    Version 2019.2 linked Oct 25 2019 22:50:27
+
+
+ **********************************************************************************************************************************
+ LABEL *                                                                                 
+  (2 PROC) 64 bit mpp version                                                            DATE: 22-Dec-20          TIME: 11:23:42  
+ **********************************************************************************************************************************
+
+ SHA1:             8dbd9ae1082e4ce945b0f27595c9eb2d4aa09004
+ **********************************************************************************************************************************
+
+ THRESHOLDS:
+
+ ZERO    =  1.00D-12  ONEINT  =  1.00D-12  TWOINT  =  1.00D-11  PREFAC  =  1.00D-14  XXXXXX  =  1.00D-09  EORDER  =  1.00D-04
+ ENERGY  =  1.00D-08  ETEST   =  0.00D+00  EDENS   =  0.00D+00  THRDEDEF=  1.00D-06  GRADIENT=  1.00D-02  STEP    =  1.00D-03
+ ORBITAL =  1.00D-08  CIVEC   =  1.00D-05  COEFF   =  1.00D-04  PRINTCI =  5.00D-02  PUNCHCI =  9.90D+01  OPTGRAD =  3.00D-04
+ OPTENERG=  1.00D-06  OPTSTEP =  3.00D-04  THRGRAD =  1.00D-10  COMPRESS=  1.00D-11  VARMIN  =  1.00D-07  VARMAX  =  1.00D-03
+ THRDOUB =  0.00D+00  THRDIV  =  1.00D-05  THRRED  =  1.00D-07  THRPSP  =  1.00D+00  THRDC   =  1.00D-10  THRCS   =  1.00D-10
+ THRNRM  =  1.00D-08  THREQ   =  0.00D+00  THRDE   =  1.00D+00  THRREF  =  1.00D-05  SPARFAC =  1.00D+00  THRDLP  =  1.00D-07
+ THRDIA  =  1.00D-10  THRDLS  =  1.00D-07  THRGPS  =  0.00D+00  THRKEX  =  0.00D+00  THRDIS  =  2.00D-01  THRVAR  =  1.00D-10
+ THRLOC  =  1.00D-06  THRGAP  =  1.00D-06  THRLOCT = -1.00D+00  THRGAPT = -1.00D+00  THRORB  =  1.00D-06  THRMLTP =  0.00D+00
+ THRCPQCI=  1.00D-10  KEXTA   =  0.00D+00  THRCOARS=  0.00D+00  SYMTOL  =  1.00D-06  GRADTOL =  1.00D-06  THROVL  =  1.00D-08
+ THRORTH =  1.00D-08  GRID    =  1.00D-08  GRIDMAX =  1.00D-03  DTMAX   =  0.00D+00  THROCCDE=  1.00D-01  THROCCDE=  1.00D-01
+ THRPRINT=  2.50D-01
+
+
+ Variable memory set to 1400000000 words,  buffer space 
+
+ ZSYMEL=NOSYM
+ ZUNIT=ANG
+
+ SETTING BASIS          =    USERDEF
+ SETTING CA             =      2101.20000000                                  
+ SETTING CB             =      2102.20000000                                  
+
+ Dummy atoms: HE
+
+
+ Recomputing integrals since basis changed
+
+
+ Using spherical harmonics
+
+ Library entry NE     S aug-cc-pVTZ          selected for orbital group  1
+ Library entry NE     P aug-cc-pVTZ          selected for orbital group  1
+ Library entry NE     D aug-cc-pVTZ          selected for orbital group  1
+ Library entry NE     F aug-cc-pVTZ          selected for orbital group  1
+ Library entry AR     S aug-cc-pVTZ          selected for orbital group  2
+ Library entry AR     P aug-cc-pVTZ          selected for orbital group  2
+ Library entry AR     D aug-cc-pVTZ          selected for orbital group  2
+ Library entry AR     F aug-cc-pVTZ          selected for orbital group  2
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+
+
+ PROGRAM * SEWARD (Integral evaluation for generally contracted gaussian basis sets)     Author: Roland Lindh, 1990
+
+ Geometry written to block  1 of record 700
+
+
+ Point group  C1  
+
+
+
+ ATOMIC COORDINATES
+
+ NR  ATOM    CHARGE       X              Y              Z
+
+   1  NE     10.00    0.000000000    0.000000000    0.000000000
+   2  AR     18.00    0.000000000    0.000000000   12.283219810
+   3  HE      0.00    0.000000000    0.000000000    6.141609905
+
+ NUCLEAR CHARGE:                   28
+ NUMBER OF PRIMITIVE AOS:         209
+ NUMBER OF SYMMETRY AOS:          182
+ NUMBER OF CONTRACTIONS:          145   (  145A   )
+ NUMBER OF CORE ORBITALS:           6   (    6A   )
+ NUMBER OF VALENCE ORBITALS:        8   (    8A   )
+
+
+ NUCLEAR REPULSION ENERGY   14.65413815
+
+
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  JKFIT                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  MP2FIT                  
+ Basis size:   303
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  DFLHF                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+
+ **********************************************************************************************************************************
+
+ EXTRA SYMMETRY OF AOS IN SYMMETRY 1:   1 1 1 1 1 2 3 1 2 3   1 2 3 1 2 3 1 1 4 2   5 3 1 4 2 5 3 1 4 2   5 3 2 3 1 6 4 7 5 2
+                                        3 1 6 4 7 5 1 1 1 1   1 1 2 3 1 2 3 1 2 3   1 2 3 1 2 3 1 1 4 2   5 3 1 4 2 5 3 1 4 2
+                                        5 3 2 3 1 6 4 7 5 2   3 1 6 4 7 5 1 1 1 1   1 2 3 1 2 3 1 2 3 1   2 3 1 2 3 1 1 4 2 5
+                                        3 1 4 2 5 3 1 4 2 5   3 2 3 1 6 4 7 5 2 3   1 6 4 7 5
+
+ Eigenvalues of metric
+
+         1 0.413E-02 0.567E-02 0.855E-02 0.115E-01 0.177E-01 0.209E-01 0.209E-01 0.255E-01
+
+
+ OPERATOR DM      FOR CENTER  0  COORDINATES:    0.000000    0.000000    0.000000
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      18       30.76       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+
+ PROGRAMS   *        TOTAL       INT
+ CPU TIMES  *         0.58      0.42
+ REAL TIME  *         1.19 SEC
+ DISK USED  *        31.08 MB (local),       62.15 MB (total)
+ GA USED    *         0.00 MB       (max)       0.00 MB       (current)
+ **********************************************************************************************************************************
+
+
+ PROGRAM * RHF-SCF (CLOSED SHELL)       Authors: W. Meyer, H.-J. Werner
+
+
+ NUMBER OF ELECTRONS:      14+   14-    SPACE SYMMETRY=1    SPIN SYMMETRY: Singlet 
+ CONVERGENCE THRESHOLDS:    1.00E-08 (Density)    1.00E-09 (Energy)
+ INTEGRAL THRESHOLDS:       1.00E-11 (Initial)    1.00E-11 (Final)
+ MAX. NUMBER OF ITERATIONS:       60
+ INTERPOLATION TYPE:            DIIS
+ INTERPOLATION STEPS:              2 (START)      1 (STEP)
+ LEVEL SHIFTS:                  0.00 (CLOSED)  0.00 (OPEN) 
+
+
+
+
+
+ Orbital guess generated from atomic densities. Full valence occupancy:   14
+ Using density fitting in orbital guess
+
+ Coulomb and exchange fitting
+ Thresholds for fitting:       THRAO_COUL= 1.0D-14    THRAO_EXCH= 1.0D-12    THRMO= 1.0D-11    THRPROD= 1.0D-11    THRASM= 1.0D-11
+                               THR2HLF=    1.0D-11
+
+ Molecular orbital dump at record        2100.2
+
+ Initial occupancy:  14
+
+ ITERATION   DDIFF            GRAD            ENERGY        2-EL.EN.            DIPOLE MOMENTS         DIIS   CPU(IT)  CPU(TOT)  ORB.
+    1      0.000D+00      0.000D+00      -655.34662036    540.128162    0.00000   -0.00000   -0.00072    0      0.1      0.3     start
+    2      0.000D+00      0.164D-03      -655.34669374    540.146715    0.00000   -0.00000   -0.00094    1      0.1      0.4     diag
+    3      0.192D-03      0.361D-04      -655.34669746    540.119928    0.00000    0.00000   -0.00101    2      0.1      0.6     diag
+    4      0.441D-04      0.183D-04      -655.34669774    540.126207    0.00000    0.00000   -0.00103    3      0.1      0.7     diag
+    5      0.139D-04      0.500D-06      -655.34669774    540.126429    0.00000    0.00000   -0.00103    4      0.1      0.8     diag
+    6      0.763D-06      0.884D-07      -655.34669774    540.126345    0.00000    0.00000   -0.00103    5      0.1      0.9     diag
+    7      0.679D-07      0.119D-07      -655.34669774    540.126352    0.00000    0.00000   -0.00103    6      0.1      1.0     diag
+    8      0.162D-07      0.142D-08      -655.34669774    540.126352    0.00000    0.00000   -0.00103    7      0.1      1.2     diag
+    9      0.277D-08      0.248D-09      -655.34669774    540.126352    0.00000    0.00000   -0.00103    0      0.1      1.3     orth
+
+ Final occupancy:  14
+
+ !RHF STATE  1.1 Energy              -655.346697736251
+ Nuclear energy                        14.65413815
+ One-electron energy                 -940.06401196
+ Two-electron energy                  270.06317607
+ Virial quotient                       -1.00010535
+ !RHF STATE  1.1 Dipole moment          0.00000000     0.00000000    -0.00102835
+ Dipole moment /Debye                   0.00000000     0.00000000    -0.00261363
+
+ Orbital energies:
+
+         1.1          2.1          3.1          4.1          5.1          6.1          7.1          8.1          9.1         10.1
+   -118.612039   -32.778947   -12.323087    -9.572058    -9.572058    -9.572053    -1.933365    -1.277819    -0.851180    -0.851152
+
+        11.1         12.1         13.1         14.1         15.1         16.1
+     -0.851152    -0.591343    -0.591289    -0.591289     0.092144     0.124617
+
+
+ HOMO     14.1    -0.591289 =     -16.0898eV
+ LUMO     15.1     0.092144 =       2.5074eV
+ LUMO-HOMO         0.683433 =      18.5972eV
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      18       30.76       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+
+              2       4        3.28       700     1000      520     2100   
+                                         GEOM     BASIS   MCVARS     RHF  
+
+ PROGRAMS   *        TOTAL     DF-HF       INT
+ CPU TIMES  *         1.91      1.33      0.42
+ REAL TIME  *         2.03 SEC
+ DISK USED  *        35.46 MB (local),       70.92 MB (total)
+ SF USED    *         5.65 MB
+ GA USED    *         3.27 MB       (max)       0.00 MB       (current)
+ **********************************************************************************************************************************
+ SETTING EDM            =      -655.34669774  AU                              
+
+ Dummy atoms: AR  HE
+
+
+ Recomputing one-electron integrals since nuclear charges changed
+
+
+ PROGRAM * SEWARD (Integral evaluation for generally contracted gaussian basis sets)     Author: Roland Lindh, 1990
+
+ Geometry written to block  1 of record 700
+
+
+ Point group  C1  
+
+
+
+ ATOMIC COORDINATES
+
+ NR  ATOM    CHARGE       X              Y              Z
+
+   1  NE     10.00    0.000000000    0.000000000    0.000000000
+   2  AR      0.00    0.000000000    0.000000000   12.283219810
+   3  HE      0.00    0.000000000    0.000000000    6.141609905
+
+ NUCLEAR CHARGE:                   10
+ NUMBER OF PRIMITIVE AOS:         209
+ NUMBER OF SYMMETRY AOS:          182
+ NUMBER OF CONTRACTIONS:          145   (  145A   )
+ NUMBER OF CORE ORBITALS:           1   (    1A   )
+ NUMBER OF VALENCE ORBITALS:        4   (    4A   )
+
+ MOLECULE CHANGED: INITIALIZING OCCUPATION AND DUMP RECORDS
+
+
+ NUCLEAR REPULSION ENERGY    0.00000000
+
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  JKFIT                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  MP2FIT                  
+ Basis size:   303
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  DFLHF                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ EXTRA SYMMETRY OF AOS IN SYMMETRY 1:   1 1 1 1 1 2 3 1 2 3   1 2 3 1 2 3 1 1 4 2   5 3 1 4 2 5 3 1 4 2   5 3 2 3 1 6 4 7 5 2
+                                        3 1 6 4 7 5 1 1 1 1   1 1 2 3 1 2 3 1 2 3   1 2 3 1 2 3 1 1 4 2   5 3 1 4 2 5 3 1 4 2
+                                        5 3 2 3 1 6 4 7 5 2   3 1 6 4 7 5 1 1 1 1   1 2 3 1 2 3 1 2 3 1   2 3 1 2 3 1 1 4 2 5
+                                        3 1 4 2 5 3 1 4 2 5   3 2 3 1 6 4 7 5 2 3   1 6 4 7 5
+
+ Eigenvalues of metric
+
+         1 0.413E-02 0.567E-02 0.855E-02 0.115E-01 0.177E-01 0.209E-01 0.209E-01 0.255E-01
+
+
+ OPERATOR DM      FOR CENTER  0  COORDINATES:    0.000000    0.000000    0.000000
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      18       30.76       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+
+              2       4        3.28       700     1000      520     2100   
+                                         GEOM     BASIS   MCVARS     RHF  
+
+ PROGRAMS   *        TOTAL       INT     DF-HF       INT
+ CPU TIMES  *         2.01      0.10      1.33      0.42
+ REAL TIME  *         2.13 SEC
+ DISK USED  *        35.46 MB (local),       70.92 MB (total)
+ SF USED    *         5.65 MB
+ GA USED    *         3.27 MB       (max)       0.00 MB       (current)
+ **********************************************************************************************************************************
+
+
+ PROGRAM * RHF-SCF (CLOSED SHELL)       Authors: W. Meyer, H.-J. Werner
+
+
+ NUMBER OF ELECTRONS:       5+    5-    SPACE SYMMETRY=1    SPIN SYMMETRY: Singlet 
+ CONVERGENCE THRESHOLDS:    1.00E-08 (Density)    1.00E-09 (Energy)
+ INTEGRAL THRESHOLDS:       1.00E-11 (Initial)    1.00E-11 (Final)
+ MAX. NUMBER OF ITERATIONS:       60
+ INTERPOLATION TYPE:            DIIS
+ INTERPOLATION STEPS:              2 (START)      1 (STEP)
+ LEVEL SHIFTS:                  0.00 (CLOSED)  0.00 (OPEN) 
+
+
+
+
+
+ Orbital guess generated from atomic densities. Full valence occupancy:    5
+ Using density fitting in orbital guess
+
+ Coulomb and exchange fitting
+ Thresholds for fitting:       THRAO_COUL= 1.0D-14    THRAO_EXCH= 1.0D-12    THRMO= 1.0D-11    THRPROD= 1.0D-11    THRASM= 1.0D-11
+                               THR2HLF=    1.0D-11
+
+ Molecular orbital dump at record        2101.2
+
+ Initial occupancy:   5
+
+ ITERATION   DDIFF            GRAD            ENERGY        2-EL.EN.            DIPOLE MOMENTS         DIIS   CPU(IT)  CPU(TOT)  ORB.
+    1      0.000D+00      0.000D+00      -128.53323909    108.000856   -0.00000   -0.00000   -0.00058    0      0.1      0.2     start
+    2      0.000D+00      0.254D-03      -128.53330118    108.019571    0.00000   -0.00000   -0.00079    1      0.1      0.4     diag
+    3      0.155D-03      0.558D-04      -128.53330428    107.997497   -0.00000    0.00000   -0.00084    2      0.1      0.5     diag
+    4      0.360D-04      0.288D-04      -128.53330453    108.003524    0.00000    0.00000   -0.00086    3      0.1      0.6     diag
+    5      0.127D-04      0.652D-06      -128.53330453    108.003570    0.00000   -0.00000   -0.00086    4      0.1      0.7     diag
+    6      0.419D-06      0.357D-07      -128.53330453    108.003569    0.00000   -0.00000   -0.00086    5      0.1      0.8     diag
+    7      0.188D-07      0.269D-08      -128.53330453    108.003569   -0.00000   -0.00000   -0.00086    6      0.1      0.9     diag
+    8      0.118D-08      0.350D-09      -128.53330453    108.003569   -0.00000   -0.00000   -0.00086    0      0.1      1.0     orth
+
+ Final occupancy:   5
+
+ !RHF STATE  1.1 Energy              -128.533304529008
+ Nuclear energy                         0.00000000
+ One-electron energy                 -182.53508918
+ Two-electron energy                   54.00178466
+ Virial quotient                       -1.00038315
+ !RHF STATE  1.1 Dipole moment         -0.00000000    -0.00000000    -0.00085590
+ Dipole moment /Debye                  -0.00000000    -0.00000000    -0.00217534
+
+ Orbital energies:
+
+         1.1          2.1          3.1          4.1          5.1          6.1          7.1
+    -32.778940    -1.933358    -0.851173    -0.851145    -0.851145     0.072852     0.094989
+
+
+ HOMO      5.1    -0.851145 =     -23.1608eV
+ LUMO      6.1     0.072852 =       1.9824eV
+ LUMO-HOMO         0.923997 =      25.1432eV
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      18       30.76       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+
+              2       5        6.62       700     1000      520     2100     2101   
+                                         GEOM     BASIS   MCVARS     RHF      RHF  
+
+ PROGRAMS   *        TOTAL     DF-HF       INT     DF-HF       INT
+ CPU TIMES  *         3.07      1.06      0.10      1.33      0.42
+ REAL TIME  *         2.77 SEC
+ DISK USED  *        38.71 MB (local),       77.43 MB (total)
+ SF USED    *         5.65 MB
+ GA USED    *         3.27 MB       (max)       0.00 MB       (current)
+ **********************************************************************************************************************************
+ SETTING EMA            =      -128.53330453  AU                              
+
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  JKFIT                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  MP2FIT                  
+ Basis size:   303
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  DFLHF                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ PROGRAM * SAPT 
+ Fix monomer properties
+
+ Geometry for monomer A:
+    1
+ NE  10.00      0.00000000      0.00000000      0.00000000
+ Nuclear attraction integrals written to record:     1001.3
+ Occupied orbitals of monomer A:     5
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      18       30.76       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+
+              2       5        6.62       700     1000      520     2100     2101   
+                                         GEOM     BASIS   MCVARS     RHF      RHF  
+
+ PROGRAMS   *        TOTAL      SAPT     DF-HF       INT     DF-HF       INT
+ CPU TIMES  *         3.15      0.08      1.06      0.10      1.33      0.42
+ REAL TIME  *         2.85 SEC
+ DISK USED  *        38.71 MB (local),       77.43 MB (total)
+ SF USED    *         5.65 MB
+ GA USED    *         3.27 MB       (max)       0.00 MB       (current)
+ **********************************************************************************************************************************
+
+ Dummy atoms: NE  HE
+
+
+ Recomputing one-electron integrals since nuclear charges changed
+
+
+ PROGRAM * SEWARD (Integral evaluation for generally contracted gaussian basis sets)     Author: Roland Lindh, 1990
+
+ Geometry written to block  1 of record 700
+
+
+ Point group  C1  
+
+
+
+ ATOMIC COORDINATES
+
+ NR  ATOM    CHARGE       X              Y              Z
+
+   1  NE      0.00    0.000000000    0.000000000    0.000000000
+   2  AR     18.00    0.000000000    0.000000000   12.283219810
+   3  HE      0.00    0.000000000    0.000000000    6.141609905
+
+ NUCLEAR CHARGE:                   18
+ NUMBER OF PRIMITIVE AOS:         209
+ NUMBER OF SYMMETRY AOS:          182
+ NUMBER OF CONTRACTIONS:          145   (  145A   )
+ NUMBER OF CORE ORBITALS:           5   (    5A   )
+ NUMBER OF VALENCE ORBITALS:        4   (    4A   )
+
+ MOLECULE CHANGED: INITIALIZING OCCUPATION AND DUMP RECORDS
+
+
+ NUCLEAR REPULSION ENERGY    0.00000000
+
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  JKFIT                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  MP2FIT                  
+ Basis size:   303
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  DFLHF                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ EXTRA SYMMETRY OF AOS IN SYMMETRY 1:   1 1 1 1 1 2 3 1 2 3   1 2 3 1 2 3 1 1 4 2   5 3 1 4 2 5 3 1 4 2   5 3 2 3 1 6 4 7 5 2
+                                        3 1 6 4 7 5 1 1 1 1   1 1 2 3 1 2 3 1 2 3   1 2 3 1 2 3 1 1 4 2   5 3 1 4 2 5 3 1 4 2
+                                        5 3 2 3 1 6 4 7 5 2   3 1 6 4 7 5 1 1 1 1   1 2 3 1 2 3 1 2 3 1   2 3 1 2 3 1 1 4 2 5
+                                        3 1 4 2 5 3 1 4 2 5   3 2 3 1 6 4 7 5 2 3   1 6 4 7 5
+
+ Eigenvalues of metric
+
+         1 0.413E-02 0.567E-02 0.855E-02 0.115E-01 0.177E-01 0.209E-01 0.209E-01 0.255E-01
+
+
+ OPERATOR DM      FOR CENTER  0  COORDINATES:    0.000000    0.000000    0.000000
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      18       30.76       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+
+              2       5        6.62       700     1000      520     2100     2101   
+                                         GEOM     BASIS   MCVARS     RHF      RHF  
+
+ PROGRAMS   *        TOTAL       INT      SAPT     DF-HF       INT     DF-HF       INT
+ CPU TIMES  *         3.25      0.10      0.08      1.06      0.10      1.33      0.42
+ REAL TIME  *         2.96 SEC
+ DISK USED  *        38.71 MB (local),       77.43 MB (total)
+ SF USED    *         5.65 MB
+ GA USED    *         3.27 MB       (max)       0.00 MB       (current)
+ **********************************************************************************************************************************
+
+
+ PROGRAM * RHF-SCF (CLOSED SHELL)       Authors: W. Meyer, H.-J. Werner
+
+
+ NUMBER OF ELECTRONS:       9+    9-    SPACE SYMMETRY=1    SPIN SYMMETRY: Singlet 
+ CONVERGENCE THRESHOLDS:    1.00E-08 (Density)    1.00E-09 (Energy)
+ INTEGRAL THRESHOLDS:       1.00E-11 (Initial)    1.00E-11 (Final)
+ MAX. NUMBER OF ITERATIONS:       60
+ INTERPOLATION TYPE:            DIIS
+ INTERPOLATION STEPS:              2 (START)      1 (STEP)
+ LEVEL SHIFTS:                  0.00 (CLOSED)  0.00 (OPEN) 
+
+
+
+
+
+ Orbital guess generated from atomic densities. Full valence occupancy:    9
+ Using density fitting in orbital guess
+
+ Coulomb and exchange fitting
+ Thresholds for fitting:       THRAO_COUL= 1.0D-14    THRAO_EXCH= 1.0D-12    THRMO= 1.0D-11    THRPROD= 1.0D-11    THRASM= 1.0D-11
+                               THR2HLF=    1.0D-11
+
+ Molecular orbital dump at record        2102.2
+
+ Initial occupancy:   9
+
+ ITERATION   DDIFF            GRAD            ENERGY        2-EL.EN.            DIPOLE MOMENTS         DIIS   CPU(IT)  CPU(TOT)  ORB.
+    1      0.000D+00      0.000D+00      -526.81338126    402.818956   -0.00000   -0.00000   -0.00014    0      0.1      0.3     start
+    2      0.000D+00      0.591D-04      -526.81339254    402.818750   -0.00000   -0.00000   -0.00014    1      0.1      0.4     diag
+    3      0.112D-03      0.130D-04      -526.81339319    402.813496   -0.00000    0.00000   -0.00015    2      0.1      0.5     diag
+    4      0.294D-04      0.163D-05      -526.81339319    402.814485    0.00000    0.00000   -0.00015    3      0.1      0.6     diag
+    5      0.180D-05      0.180D-06      -526.81339319    402.814370    0.00000    0.00000   -0.00015    4      0.1      0.7     diag
+    6      0.341D-06      0.202D-07      -526.81339319    402.814376   -0.00000    0.00000   -0.00015    5      0.1      0.8     diag
+    7      0.305D-07      0.269D-08      -526.81339319    402.814376    0.00000   -0.00000   -0.00015    6      0.1      1.0     diag
+    8      0.383D-08      0.458D-09      -526.81339319    402.814376    0.00000    0.00000   -0.00015    0      0.1      1.1     orth
+
+ Final occupancy:   9
+
+ !RHF STATE  1.1 Energy              -526.813393189695
+ Nuclear energy                         0.00000000
+ One-electron energy                 -728.22058108
+ Two-electron energy                  201.40718789
+ Virial quotient                       -1.00003759
+ !RHF STATE  1.1 Dipole moment          0.00000000     0.00000000    -0.00015327
+ Dipole moment /Debye                   0.00000000     0.00000000    -0.00038955
+
+ Orbital energies:
+
+         1.1          2.1          3.1          4.1          5.1          6.1          7.1          8.1          9.1         10.1
+   -118.612047   -12.323095    -9.572066    -9.572066    -9.572061    -1.277827    -0.591350    -0.591296    -0.591296     0.085340
+
+        11.1
+      0.124054
+
+
+ HOMO      9.1    -0.591296 =     -16.0900eV
+ LUMO     10.1     0.085340 =       2.3222eV
+ LUMO-HOMO         0.676637 =      18.4122eV
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      18       30.76       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+
+              2       6        9.96       700     1000      520     2100     2101     2102   
+                                         GEOM     BASIS   MCVARS     RHF      RHF      RHF  
+
+ PROGRAMS   *        TOTAL     DF-HF       INT      SAPT     DF-HF       INT     DF-HF       INT
+ CPU TIMES  *         4.37      1.12      0.10      0.08      1.06      0.10      1.33      0.42
+ REAL TIME  *         3.62 SEC
+ DISK USED  *        42.22 MB (local),       84.44 MB (total)
+ SF USED    *         5.65 MB
+ GA USED    *         3.27 MB       (max)       0.00 MB       (current)
+ **********************************************************************************************************************************
+ SETTING EMB            =      -526.81339319  AU                              
+
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  JKFIT                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  MP2FIT                  
+ Basis size:   303
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  DFLHF                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ PROGRAM * SAPT 
+ Fix monomer properties
+
+ Geometry for monomer B:
+    1
+ AR  18.00      0.00000000      0.00000000     12.28321981
+ Nuclear attraction integrals written to record:     1002.3
+ Occupied orbitals of monomer B:     9
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      18       30.76       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+
+              2       6        9.96       700     1000      520     2100     2101     2102   
+                                         GEOM     BASIS   MCVARS     RHF      RHF      RHF  
+
+ PROGRAMS   *        TOTAL      SAPT     DF-HF       INT      SAPT     DF-HF       INT     DF-HF       INT
+ CPU TIMES  *         4.45      0.08      1.12      0.10      0.08      1.06      0.10      1.33      0.42
+ REAL TIME  *         3.71 SEC
+ DISK USED  *        42.22 MB (local),       84.44 MB (total)
+ SF USED    *         5.65 MB
+ GA USED    *         3.27 MB       (max)       0.00 MB       (current)
+ **********************************************************************************************************************************
+
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  JKFIT                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  MP2FIT                  
+ Basis size:   303
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  DFLHF                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+
+ PROGRAM * SAPT      Authors: A. Hesselmann, G. Jansen, 2003
+
+ (Calculation of intermolecular interaction energy contributions
+  for single-determinant wave-functions)
+
+ Monomer A wave function in record             2101.2
+ Monomer A electrostatic potential in record   1001.3
+ Monomer B wave function in record             2102.2
+ Monomer B electrostatic potential in record   1002.3
+ Overlap matrix in record                      1000.3
+
+ Factor for nonlocal exchange:                  1.000000
+ Factor for VWN correlation in ALDA  kernel:    1.000000
+ Print factor:   0
+ Density fitting level:   3
+ Level of calculation:    2
+ Calculate exchange terms with infinite overlap expansion
+
+ CPKS solver:    1
+ CPKS convergence threshold:   0.10000000E-05
+ CPKS maximumb number of iterations:     50
+
+ Occupied space for monomer A:    5
+ Virtual  space for monomer A:  140
+
+ Occupied space for monomer B:    9
+ Virtual  space for monomer B:  136
+
+
+ Transform atomic integrals
+ ==========================
+ J/K matrices for monomer A
+ J/K matrices for monomer B
+ W matrix for monomer A
+ W matrix for monomer B
+
+ CPU time for integrals:       5.22 sec
+
+
+ Response calculations
+ - - - - - - - - - - - 
+ Calculate response for monomer A
+ ITER    DIFF       Induction     Time
+   1    0.000024   -0.000000      0.00
+   2    0.000002   -0.000000      2.74
+   3    0.000000   -0.000000      0.11
+ Second order induction =      -0.00000001
+
+ CPU time for CPKS(A):       2.96 sec
+
+
+
+ Calculate response for monomer B
+ ITER    DIFF       Induction     Time
+   1    0.000010   -0.000000      0.00
+   2    0.000001   -0.000000      2.73
+   3    0.000000   -0.000000      0.11
+ Second order induction =      -0.00000000
+
+ CPU time for CPKS(B):       2.96 sec
+
+
+
+ E1pol
+ =====
+ Internuclear repulsion            14.654138148554
+ E1pol =                           -0.000000016302
+
+ CPU time for E1pol:            0.01 sec
+
+
+ E1pol+E1exch
+ ============
+ E1INT(Sinf) =                     -0.000000016112
+ E1exch(Sinf) =                     0.000000000190
+
+ CPU time for E1exch(Sinf):       2.76 sec
+
+
+ E2ind
+ =====
+ Induction B->A =                  -0.000000005401
+ Induction A->B =                  -0.000000000624
+ E2ind =                           -0.000000006025
+
+ CPU time for E2ind:            0.00 sec
+
+
+ E2ind+E2exch-ind
+ ================
+ E2IND(A<-B) =                     -0.000000001231
+ E2IND(B<-A) =                     -0.000000000086
+ E2IND =                           -0.000000001317
+ E2exch-ind(Sinf) =                 0.000000004708
+
+ CPU time for E2exch-ind:       2.78 sec
+
+
+
+
+ ===========
+ IMW Results
+ ===========
+                             [mH]                [kcal/mol]          [kJ/mol]
+ E1pol                      -0.00001630         -0.00001023         -0.00004280
+ E1exch                      0.00000019          0.00000012          0.00000050
+
+ E2ind                      -0.00000603         -0.00000378         -0.00001582
+ E2ind-exch                  0.00000471          0.00000295          0.00001236
+
+ E1tot                      -0.00001611         -0.00001011         -0.00004230
+ E2tot                      -0.00000132         -0.00000083         -0.00000346
+ E1tot+E2tot                -0.00001743         -0.00001094         -0.00004576
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      21       37.01       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700     2541     2542   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+                                         2541(1)
+
+              2       6        9.96       700     1000      520     2100     2101     2102   
+                                         GEOM     BASIS   MCVARS     RHF      RHF      RHF  
+
+ PROGRAMS   *        TOTAL      SAPT      SAPT     DF-HF       INT      SAPT     DF-HF       INT     DF-HF       INT
+ CPU TIMES  *        21.23     16.78      0.08      1.12      0.10      0.08      1.06      0.10      1.33      0.42
+ REAL TIME  *        13.38 SEC
+ DISK USED  *        52.38 MB (local),       99.88 MB (total)
+ SF USED    *        12.32 MB
+ GA USED    *         3.27 MB       (max)       0.00 MB       (current)
+ **********************************************************************************************************************************
+ SETTING EINT_HF        =    -1.75482455D-05  MH                              
+ SETTING DELTA_HF       =    -1.18992220D-07  mH                              
+ SETTING CA             =      2103.20000000                                  
+ SETTING CB             =      2104.20000000                                  
+ SETTING EPS_HOMO_PBE0_B=        -0.44093600                                  
+ SETTING EPS_HOMO_PBE0_A=        -0.58920700                                  
+ SETTING IP_B           =         0.57920000                                  
+ SETTING IP_A           =         0.79250000                                  
+ SETTING SHIFT_B        =         0.13826400                                  
+ SETTING SHIFT_A        =         0.20329300                                  
+
+ Dummy atoms: AR  HE
+
+
+ Recomputing one-electron integrals since nuclear charges changed
+
+
+ PROGRAM * SEWARD (Integral evaluation for generally contracted gaussian basis sets)     Author: Roland Lindh, 1990
+
+ Geometry written to block  1 of record 700
+
+
+ Point group  C1  
+
+
+
+ ATOMIC COORDINATES
+
+ NR  ATOM    CHARGE       X              Y              Z
+
+   1  NE     10.00    0.000000000    0.000000000    0.000000000
+   2  AR      0.00    0.000000000    0.000000000   12.283219810
+   3  HE      0.00    0.000000000    0.000000000    6.141609905
+
+ NUCLEAR CHARGE:                   10
+ NUMBER OF PRIMITIVE AOS:         209
+ NUMBER OF SYMMETRY AOS:          182
+ NUMBER OF CONTRACTIONS:          145   (  145A   )
+ NUMBER OF CORE ORBITALS:           1   (    1A   )
+ NUMBER OF VALENCE ORBITALS:        4   (    4A   )
+
+ MOLECULE CHANGED: INITIALIZING OCCUPATION AND DUMP RECORDS
+
+
+ NUCLEAR REPULSION ENERGY    0.00000000
+
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  JKFIT                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  MP2FIT                  
+ Basis size:   303
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  DFLHF                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ EXTRA SYMMETRY OF AOS IN SYMMETRY 1:   1 1 1 1 1 2 3 1 2 3   1 2 3 1 2 3 1 1 4 2   5 3 1 4 2 5 3 1 4 2   5 3 2 3 1 6 4 7 5 2
+                                        3 1 6 4 7 5 1 1 1 1   1 1 2 3 1 2 3 1 2 3   1 2 3 1 2 3 1 1 4 2   5 3 1 4 2 5 3 1 4 2
+                                        5 3 2 3 1 6 4 7 5 2   3 1 6 4 7 5 1 1 1 1   1 2 3 1 2 3 1 2 3 1   2 3 1 2 3 1 1 4 2 5
+                                        3 1 4 2 5 3 1 4 2 5   3 2 3 1 6 4 7 5 2 3   1 6 4 7 5
+
+ Eigenvalues of metric
+
+         1 0.413E-02 0.567E-02 0.855E-02 0.115E-01 0.177E-01 0.209E-01 0.209E-01 0.255E-01
+
+
+ OPERATOR DM      FOR CENTER  0  COORDINATES:    0.000000    0.000000    0.000000
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      21       37.01       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700     2541     2542   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+                                         2541(1)
+
+              2       6        9.96       700     1000      520     2100     2101     2102   
+                                         GEOM     BASIS   MCVARS     RHF      RHF      RHF  
+
+ PROGRAMS   *        TOTAL       INT      SAPT      SAPT     DF-HF       INT      SAPT     DF-HF       INT     DF-HF       INT
+ CPU TIMES  *        21.34      0.10     16.78      0.08      1.12      0.10      0.08      1.06      0.10      1.33      0.42
+ REAL TIME  *        13.49 SEC
+ DISK USED  *        52.38 MB (local),       99.88 MB (total)
+ SF USED    *        12.32 MB
+ GA USED    *         3.27 MB       (max)       0.00 MB       (current)
+ **********************************************************************************************************************************
+
+ Functional: LHF(Local Hartree-Fock exchange functional)                       Gradient terms: 0
+ Functional: PBEX(Automatically generated (new) PBEX)                          Gradient terms: 1
+ Functional: PW91C(Automatically generated (new) PW91C)                        Gradient terms: 1
+
+ asymptotic correction (GRAC) activated
+ bulk shift:           0.203293
+ alpha grac value:     0.500000
+ beta grac value:     40.000000
+ lb94 parameter:       0.050000
+ Use libxcgrid:  F
+ Use grid at  1800.2
+
+
+ Exact exchange will be calculated, factor:  0.2500
+
+ Functional: PBEX                      Factor:  0.7500
+ Functional: PW91C                     Factor:  1.0000
+ Functional: LHF                       Factor:  0.2500
+
+ Generated new metagrid on record  1800.2 with target accuracy 1.0D-08 and 26904 points in CPU time    0.2
+ Computed new grid on record 1800.1 in CPU time    0.2
+  119886 words reserved for DFT integration
+
+ PROGRAM * RKS-SCF (Restricted closed shell Kohn-Sham)     Authors: W. Meyer, H.-J. Werner, P.J. Knowles, 1993
+
+ NUMBER OF ELECTRONS:       5+    5-    SPACE SYMMETRY=1    SPIN SYMMETRY: Singlet 
+ CONVERGENCE THRESHOLDS:    1.00E-08 (Density)    1.00E-08 (Energy)
+ INTEGRAL THRESHOLDS:       1.00E-11 (Initial)    1.00E-11 (Final)
+ MAX. NUMBER OF ITERATIONS:       60
+ INTERPOLATION TYPE:            DIIS
+ INTERPOLATION STEPS:              2 (START)      1 (STEP)
+ LEVEL SHIFTS:                  0.00 (CLOSED)  0.00 (OPEN) 
+
+
+
+ Use fine grid record 1800.2 for energy threshold  1.0D-08
+
+
+ Orbital guess generated from atomic densities. Full valence occupancy:    5
+ Using density fitting in orbital guess
+
+ Coulomb and exchange fitting
+ Thresholds for fitting:       THRAO_COUL= 1.0D-14    THRAO_EXCH= 1.0D-12    THRMO= 1.0D-11    THRPROD= 1.0D-11    THRASM= 1.0D-11
+                               THR2HLF=    1.0D-11
+
+ Molecular orbital dump at record        2103.2
+
+ Initial occupancy:   5
+
+ ITERATION   DDIFF            GRAD            ENERGY        2-EL.EN.            DIPOLE MOMENTS         DIIS   CPU(IT)  CPU(TOT)  ORB.
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  10
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1
+ HOMO eigenvalue =    -0.770013
+ Degeneracy      =    3
+  sym orb
+   1   3   3
+   1   4   4
+   1   5   5
+ HF exchange energy =        -12.05009207
+ Number of GTO auxiliary functions:       299
+ Available memory:1399668290 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.04
+
+ Slater exchange energy =    -12.05009207
+ Slater Test =                -0.00000000
+ Time for Elec. Potential:      0.56
+ Time for Linear Algebra:       0.01
+ Total Time in Slater C:          0.66
+ Total Time in Response  :      0.14
+    1      0.000D+00      0.000D+00      -128.88838638    125.644956   -0.00000   -0.00000   -0.00069    0      1.1      1.4     start
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  10
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1
+ HOMO eigenvalue =    -0.799592
+ Degeneracy      =    3
+  sym orb
+   1   3   3
+   1   4   4
+   1   5   5
+ HF exchange energy =        -12.08792101
+ Number of GTO auxiliary functions:       299
+ Available memory:1399668290 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.04
+
+ Slater exchange energy =    -12.08792101
+ Slater Test =                 0.00000000
+ Time for Elec. Potential:      0.53
+ Time for Linear Algebra:       0.02
+ Total Time in Slater C:          0.66
+ Total Time in Response  :      0.14
+    2      0.000D+00      0.149D-02      -128.88794292    126.260401    0.00000   -0.00000   -0.00063    1      1.1      2.5     diag
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  10
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1
+ HOMO eigenvalue =    -0.785261
+ Degeneracy      =    3
+  sym orb
+   1   3   3
+   1   4   4
+   1   5   5
+ HF exchange energy =        -12.05367647
+ Number of GTO auxiliary functions:       299
+ Available memory:1399668290 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.04
+
+ Slater exchange energy =    -12.05367647
+ Slater Test =                 0.00000000
+ Time for Elec. Potential:      0.55
+ Time for Linear Algebra:       0.03
+ Total Time in Slater C:          0.67
+ Total Time in Response  :      0.14
+    3      0.743D-03      0.105D-02      -128.88836552    125.753081   -0.00000   -0.00000   -0.00061    2      1.1      3.6     diag
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  10
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1
+ HOMO eigenvalue =    -0.789404
+ Degeneracy      =    3
+  sym orb
+   1   3   3
+   1   4   4
+   1   5   5
+ HF exchange energy =        -12.06403703
+ Number of GTO auxiliary functions:       299
+ Available memory:1399668290 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.03
+
+ Slater exchange energy =    -12.06403703
+ Slater Test =                 0.00000000
+ Time for Elec. Potential:      0.50
+ Time for Linear Algebra:       0.04
+ Total Time in Slater C:          0.67
+ Total Time in Response  :      0.13
+    4      0.555D-03      0.468D-03      -128.88838257    125.905849   -0.00000   -0.00000   -0.00062    3      1.1      4.8     diag
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  10
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1
+ HOMO eigenvalue =    -0.789442
+ Degeneracy      =    3
+  sym orb
+   1   3   3
+   1   4   4
+   1   5   5
+ HF exchange energy =        -12.06412430
+ Number of GTO auxiliary functions:       299
+ Available memory:1399668290 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.04
+
+ Slater exchange energy =    -12.06412430
+ Slater Test =                 0.00000000
+ Time for Elec. Potential:      0.59
+ Time for Linear Algebra:       0.00
+ Total Time in Slater C:          0.67
+ Total Time in Response  :      0.14
+    5      0.167D-03      0.326D-05      -128.88838204    125.907135    0.00000    0.00000   -0.00062    4      1.1      5.9     diag
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  10
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1
+ HOMO eigenvalue =    -0.789438
+ Degeneracy      =    3
+  sym orb
+   1   3   3
+   1   4   4
+   1   5   5
+ HF exchange energy =        -12.06411808
+ Number of GTO auxiliary functions:       299
+ Available memory:1399668290 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.04
+
+ Slater exchange energy =    -12.06411808
+ Slater Test =                 0.00000000
+ Time for Elec. Potential:      0.53
+ Time for Linear Algebra:       0.04
+ Total Time in Slater C:          0.67
+ Total Time in Response  :      0.14
+    6      0.126D-05      0.255D-06      -128.88838207    125.907044    0.00000   -0.00000   -0.00062    5      1.1      7.0     diag
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  10
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1
+ HOMO eigenvalue =    -0.789438
+ Degeneracy      =    3
+  sym orb
+   1   3   3
+   1   4   4
+   1   5   5
+ HF exchange energy =        -12.06411800
+ Number of GTO auxiliary functions:       299
+ Available memory:1399668290 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.04
+
+ Slater exchange energy =    -12.06411800
+ Slater Test =                 0.00000000
+ Time for Elec. Potential:      0.53
+ Time for Linear Algebra:       0.02
+ Total Time in Slater C:          0.67
+ Total Time in Response  :      0.14
+    7      0.913D-07      0.706D-08      -128.88838207    125.907043    0.00000    0.00000   -0.00062    6      1.1      8.1     diag
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  10
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1
+ HOMO eigenvalue =    -0.789438
+ Degeneracy      =    3
+  sym orb
+   1   3   3
+   1   4   4
+   1   5   5
+ HF exchange energy =        -12.06411801
+ Number of GTO auxiliary functions:       299
+ Available memory:1399668290 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.03
+
+ Slater exchange energy =    -12.06411801
+ Slater Test =                 0.00000000
+ Time for Elec. Potential:      0.50
+ Time for Linear Algebra:       0.04
+ Total Time in Slater C:          0.67
+ Total Time in Response  :      0.13
+    8      0.137D-08      0.738D-09      -128.88838207    125.907043    0.00000   -0.00000   -0.00062    0      1.1      9.3     orth
+
+ Final occupancy:   5
+
+ !RKS STATE  1.1 Energy              -128.888382069359
+ Nuclear energy                         0.00000000
+ One-electron energy                 -182.43435577
+ Two-electron energy                   62.95352142
+ SCF exchange energy                  -12.06411801     Factor= 0.2500
+ Density functional                    -9.40754772     PBEX=-12.03698486 PW91C= -0.37980907
+ Virial quotient                       -1.00468559
+ !RKS STATE  1.1 Dipole moment          0.00000000    -0.00000000    -0.00062116
+ Dipole moment /Debye                   0.00000000    -0.00000000    -0.00157874
+
+ Orbital energies:
+
+         1.1          2.1          3.1          4.1          5.1          6.1          7.1
+    -30.775690    -1.638810    -0.789439    -0.789438    -0.789438    -0.146625    -0.066300
+
+
+ HOMO      5.1    -0.789438 =     -21.4817eV
+ LUMO      6.1    -0.146625 =      -3.9899eV
+ LUMO-HOMO         0.642813 =      17.4918eV
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      22       37.01       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700     2541     2542   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+                                         2541(1)  1800   
+                                                  GRID   
+
+              2       8       13.30       700     1000      520     2100     2101     2102     1800     2103   
+                                         GEOM     BASIS   MCVARS     RHF      RHF      RHF     GRID      RKS  
+
+              4       3        2.62      4000     2400     5000   
+                                         JMAT               JOP  
+
+ PROGRAMS   *        TOTAL     DF-KS       INT      SAPT      SAPT     DF-HF       INT      SAPT     DF-HF       INT     DF-HF
+ CPU TIMES  *        30.84      9.50      0.10     16.78      0.08      1.12      0.10      0.08      1.06      0.10      1.33
+ REAL TIME  *        18.64 SEC
+ DISK USED  *        52.38 MB (local),      104.49 MB (total)
+ SF USED    *        12.32 MB
+ GA USED    *         4.19 MB       (max)       0.93 MB       (current)
+ **********************************************************************************************************************************
+
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  JKFIT                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  MP2FIT                  
+ Basis size:   303
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  DFLHF                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ PROGRAM * SAPT 
+ Fix monomer properties
+
+ Geometry for monomer A:
+    1
+ NE  10.00      0.00000000      0.00000000      0.00000000
+ Nuclear attraction integrals written to record:     1001.3
+ Occupied orbitals of monomer A:     5
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      22       37.01       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700     2541     2542   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+                                         2541(1)  1800   
+                                                  GRID   
+
+              2       8       13.30       700     1000      520     2100     2101     2102     1800     2103   
+                                         GEOM     BASIS   MCVARS     RHF      RHF      RHF     GRID      RKS  
+
+ PROGRAMS   *        TOTAL      SAPT     DF-KS       INT      SAPT      SAPT     DF-HF       INT      SAPT     DF-HF       INT
+ CPU TIMES  *        30.92      0.08      9.50      0.10     16.78      0.08      1.12      0.10      0.08      1.06      0.10
+ REAL TIME  *        18.73 SEC
+ DISK USED  *        52.38 MB (local),      104.49 MB (total)
+ SF USED    *        12.32 MB
+ GA USED    *         4.19 MB       (max)       0.93 MB       (current)
+ **********************************************************************************************************************************
+
+ Dummy atoms: NE  HE
+
+
+ Recomputing one-electron integrals since nuclear charges changed
+
+
+ PROGRAM * SEWARD (Integral evaluation for generally contracted gaussian basis sets)     Author: Roland Lindh, 1990
+
+ Geometry written to block  1 of record 700
+
+
+ Point group  C1  
+
+
+
+ ATOMIC COORDINATES
+
+ NR  ATOM    CHARGE       X              Y              Z
+
+   1  NE      0.00    0.000000000    0.000000000    0.000000000
+   2  AR     18.00    0.000000000    0.000000000   12.283219810
+   3  HE      0.00    0.000000000    0.000000000    6.141609905
+
+ NUCLEAR CHARGE:                   18
+ NUMBER OF PRIMITIVE AOS:         209
+ NUMBER OF SYMMETRY AOS:          182
+ NUMBER OF CONTRACTIONS:          145   (  145A   )
+ NUMBER OF CORE ORBITALS:           5   (    5A   )
+ NUMBER OF VALENCE ORBITALS:        4   (    4A   )
+
+ MOLECULE CHANGED: INITIALIZING OCCUPATION AND DUMP RECORDS
+
+
+ NUCLEAR REPULSION ENERGY    0.00000000
+
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  JKFIT                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  MP2FIT                  
+ Basis size:   303
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  DFLHF                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ EXTRA SYMMETRY OF AOS IN SYMMETRY 1:   1 1 1 1 1 2 3 1 2 3   1 2 3 1 2 3 1 1 4 2   5 3 1 4 2 5 3 1 4 2   5 3 2 3 1 6 4 7 5 2
+                                        3 1 6 4 7 5 1 1 1 1   1 1 2 3 1 2 3 1 2 3   1 2 3 1 2 3 1 1 4 2   5 3 1 4 2 5 3 1 4 2
+                                        5 3 2 3 1 6 4 7 5 2   3 1 6 4 7 5 1 1 1 1   1 2 3 1 2 3 1 2 3 1   2 3 1 2 3 1 1 4 2 5
+                                        3 1 4 2 5 3 1 4 2 5   3 2 3 1 6 4 7 5 2 3   1 6 4 7 5
+
+ Eigenvalues of metric
+
+         1 0.413E-02 0.567E-02 0.855E-02 0.115E-01 0.177E-01 0.209E-01 0.209E-01 0.255E-01
+
+
+ OPERATOR DM      FOR CENTER  0  COORDINATES:    0.000000    0.000000    0.000000
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      22       37.01       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700     2541     2542   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+                                         2541(1)  1800   
+                                                  GRID   
+
+              2       8       13.30       700     1000      520     2100     2101     2102     1800     2103   
+                                         GEOM     BASIS   MCVARS     RHF      RHF      RHF     GRID      RKS  
+
+ PROGRAMS   *        TOTAL       INT      SAPT     DF-KS       INT      SAPT      SAPT     DF-HF       INT      SAPT     DF-HF
+ CPU TIMES  *        31.03      0.10      0.08      9.50      0.10     16.78      0.08      1.12      0.10      0.08      1.06
+ REAL TIME  *        18.84 SEC
+ DISK USED  *        52.38 MB (local),      104.49 MB (total)
+ SF USED    *        12.32 MB
+ GA USED    *         4.19 MB       (max)       0.93 MB       (current)
+ **********************************************************************************************************************************
+
+ Functional: LHF(Local Hartree-Fock exchange functional)                       Gradient terms: 0
+ Functional: PBEX(Automatically generated (new) PBEX)                          Gradient terms: 1
+ Functional: PW91C(Automatically generated (new) PW91C)                        Gradient terms: 1
+
+ asymptotic correction (GRAC) activated
+ bulk shift:           0.138264
+ alpha grac value:     0.500000
+ beta grac value:     40.000000
+ lb94 parameter:       0.050000
+ Use libxcgrid:  F
+ Use grid at  1800.2
+
+
+ Exact exchange will be calculated, factor:  0.2500
+
+ Functional: PBEX                      Factor:  0.7500
+ Functional: PW91C                     Factor:  1.0000
+ Functional: LHF                       Factor:  0.2500
+
+  119886 words reserved for DFT integration
+
+ PROGRAM * RKS-SCF (Restricted closed shell Kohn-Sham)     Authors: W. Meyer, H.-J. Werner, P.J. Knowles, 1993
+
+ NUMBER OF ELECTRONS:       9+    9-    SPACE SYMMETRY=1    SPIN SYMMETRY: Singlet 
+ CONVERGENCE THRESHOLDS:    1.00E-08 (Density)    1.00E-08 (Energy)
+ INTEGRAL THRESHOLDS:       1.00E-11 (Initial)    1.00E-11 (Final)
+ MAX. NUMBER OF ITERATIONS:       60
+ INTERPOLATION TYPE:            DIIS
+ INTERPOLATION STEPS:              2 (START)      1 (STEP)
+ LEVEL SHIFTS:                  0.00 (CLOSED)  0.00 (OPEN) 
+
+
+
+ Use fine grid record 1800.2 for energy threshold  1.0D-08
+
+
+ Orbital guess generated from atomic densities. Full valence occupancy:    9
+ Using density fitting in orbital guess
+
+ Coulomb and exchange fitting
+ Thresholds for fitting:       THRAO_COUL= 1.0D-14    THRAO_EXCH= 1.0D-12    THRMO= 1.0D-11    THRPROD= 1.0D-11    THRASM= 1.0D-11
+                               THR2HLF=    1.0D-11
+
+ Molecular orbital dump at record        2104.2
+
+ Initial occupancy:   9
+
+ ITERATION   DDIFF            GRAD            ENERGY        2-EL.EN.            DIPOLE MOMENTS         DIIS   CPU(IT)  CPU(TOT)  ORB.
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  18
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1  6.1  7.1  8.1  9.1
+ HOMO eigenvalue =    -0.582562
+ Degeneracy      =    2
+  sym orb
+   1   8   8
+   1   9   9
+ HF exchange energy =        -30.16460234
+ Number of GTO auxiliary functions:       299
+ Available memory:1399648490 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.07
+
+ Slater exchange energy =    -30.16460233
+ Slater Test =                -0.00000001
+ Time for Elec. Potential:      0.60
+ Time for Linear Algebra:       0.02
+ Total Time in Slater C:          0.69
+ Total Time in Response  :      0.14
+    1      0.000D+00      0.000D+00      -527.44573285    448.421032    0.00000   -0.00000   -0.00012    0      1.2      1.5     start
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  18
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1  6.1  7.1  8.1  9.1
+ HOMO eigenvalue =    -0.574635
+ Degeneracy      =    2
+  sym orb
+   1   8   8
+   1   9   9
+ HF exchange energy =        -30.14195798
+ Number of GTO auxiliary functions:       299
+ Available memory:1399648490 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.07
+
+ Slater exchange energy =    -30.14195797
+ Slater Test =                -0.00000001
+ Time for Elec. Potential:      0.58
+ Time for Linear Algebra:       0.02
+ Total Time in Slater C:          0.68
+ Total Time in Response  :      0.15
+    2      0.000D+00      0.984D-03      -527.44566103    447.935900   -0.00000    0.00000   -0.00044    1      1.2      2.7     diag
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  18
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1  6.1  7.1  8.1  9.1
+ HOMO eigenvalue =    -0.580296
+ Degeneracy      =    2
+  sym orb
+   1   8   8
+   1   9   9
+ HF exchange energy =        -30.15635076
+ Number of GTO auxiliary functions:       299
+ Available memory:1399648490 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.07
+
+ Slater exchange energy =    -30.15635075
+ Slater Test =                -0.00000001
+ Time for Elec. Potential:      0.50
+ Time for Linear Algebra:       0.02
+ Total Time in Slater C:          0.68
+ Total Time in Response  :      0.14
+    3      0.885D-03      0.223D-03      -527.44564684    448.317851   -0.00000   -0.00000   -0.00040    2      1.2      3.9     diag
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  18
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1  6.1  7.1  8.1  9.1
+ HOMO eigenvalue =    -0.578092
+ Degeneracy      =    2
+  sym orb
+   1   8   8
+   1   9   9
+ HF exchange energy =        -30.15032738
+ Number of GTO auxiliary functions:       299
+ Available memory:1399648490 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.07
+
+ Slater exchange energy =    -30.15032738
+ Slater Test =                -0.00000001
+ Time for Elec. Potential:      0.53
+ Time for Linear Algebra:       0.00
+ Total Time in Slater C:          0.68
+ Total Time in Response  :      0.15
+    4      0.237D-03      0.156D-03      -527.44568429    448.156085    0.00000    0.00000   -0.00042    3      1.2      5.0     diag
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  18
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1  6.1  7.1  8.1  9.1
+ HOMO eigenvalue =    -0.578131
+ Degeneracy      =    2
+  sym orb
+   1   8   8
+   1   9   9
+ HF exchange energy =        -30.15041773
+ Number of GTO auxiliary functions:       299
+ Available memory:1399648490 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.07
+
+ Slater exchange energy =    -30.15041772
+ Slater Test =                -0.00000001
+ Time for Elec. Potential:      0.56
+ Time for Linear Algebra:       0.02
+ Total Time in Slater C:          0.68
+ Total Time in Response  :      0.15
+    5      0.101D-03      0.226D-05      -527.44568383    448.158678    0.00000    0.00000   -0.00042    4      1.2      6.2     diag
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  18
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1  6.1  7.1  8.1  9.1
+ HOMO eigenvalue =    -0.578129
+ Degeneracy      =    2
+  sym orb
+   1   8   8
+   1   9   9
+ HF exchange energy =        -30.15041320
+ Number of GTO auxiliary functions:       299
+ Available memory:1399648490 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.07
+
+ Slater exchange energy =    -30.15041320
+ Slater Test =                -0.00000001
+ Time for Elec. Potential:      0.44
+ Time for Linear Algebra:       0.02
+ Total Time in Slater C:          0.68
+ Total Time in Response  :      0.15
+    6      0.215D-05      0.118D-06      -527.44568385    448.158551   -0.00000    0.00000   -0.00042    5      1.2      7.4     diag
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  18
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1  6.1  7.1  8.1  9.1
+ HOMO eigenvalue =    -0.578129
+ Degeneracy      =    2
+  sym orb
+   1   8   8
+   1   9   9
+ HF exchange energy =        -30.15041308
+ Number of GTO auxiliary functions:       299
+ Available memory:1399648490 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.07
+
+ Slater exchange energy =    -30.15041307
+ Slater Test =                -0.00000001
+ Time for Elec. Potential:      0.59
+ Time for Linear Algebra:       0.00
+ Total Time in Slater C:          0.68
+ Total Time in Response  :      0.15
+    7      0.115D-06      0.407D-08      -527.44568385    448.158547   -0.00000   -0.00000   -0.00042    6      1.2      8.6     diag
+ PROGRAM * DF-LHF                      (Local Hartree-Fock)
+ Authors: A. Hesselmann, 2005
+
+ Number of electrons =  18
+
+ Orbitals to be computed:   1.1  2.1  3.1  4.1  5.1  6.1  7.1  8.1  9.1
+ HOMO eigenvalue =    -0.578129
+ Degeneracy      =    2
+  sym orb
+   1   8   8
+   1   9   9
+ HF exchange energy =        -30.15041308
+ Number of GTO auxiliary functions:       299
+ Available memory:1399648490 words
+ Integral transformation routine:     2
+
+ Transforming 3idx Coulomb integrals to MO basis...
+ Memory for 3-index integrals:            0.00 MW
+ CPU time for integral transfomation:     0.07
+
+ Slater exchange energy =    -30.15041308
+ Slater Test =                -0.00000001
+ Time for Elec. Potential:      0.52
+ Time for Linear Algebra:       0.02
+ Total Time in Slater C:          0.68
+ Total Time in Response  :      0.14
+    8      0.357D-08      0.115D-08      -527.44568385    448.158547   -0.00000    0.00000   -0.00042    0      1.2      9.8     orth
+
+ Final occupancy:   9
+
+ !RKS STATE  1.1 Energy              -527.445683850708
+ Nuclear energy                         0.00000000
+ One-electron energy                 -728.27519263
+ Two-electron energy                  224.07927370
+ SCF exchange energy                  -30.15041308     Factor= 0.2500
+ Density functional                   -23.24976492     PBEX=-29.97310629 PW91C= -0.76993520
+ Virial quotient                       -1.00251148
+ !RKS STATE  1.1 Dipole moment         -0.00000000     0.00000000    -0.00041612
+ Dipole moment /Debye                  -0.00000000     0.00000000    -0.00105760
+
+ Orbital energies:
+
+         1.1          2.1          3.1          4.1          5.1          6.1          7.1          8.1          9.1         10.1
+   -114.406431   -11.068948    -8.682857    -8.682857    -8.682408    -1.084898    -0.578501    -0.578129    -0.578129    -0.139968
+
+        11.1
+     -0.081849
+
+
+ HOMO      9.1    -0.578129 =     -15.7317eV
+ LUMO     10.1    -0.139968 =      -3.8087eV
+ LUMO-HOMO         0.438161 =      11.9230eV
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      22       37.01       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700     2541     2542   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+                                         2541(1)  1800   
+                                                  GRID   
+
+              2       9       16.64       700     1000      520     2100     2101     2102     1800     2103     2104   
+                                         GEOM     BASIS   MCVARS     RHF      RHF      RHF     GRID      RKS      RKS  
+
+              4       3        3.56      4000     2400     5000   
+                                         JMAT               JOP  
+
+ PROGRAMS   *        TOTAL     DF-KS       INT      SAPT     DF-KS       INT      SAPT      SAPT     DF-HF       INT      SAPT
+ CPU TIMES  *        40.80      9.77      0.10      0.08      9.50      0.10     16.78      0.08      1.12      0.10      0.08
+ REAL TIME  *        23.90 SEC
+ DISK USED  *        55.46 MB (local),      110.91 MB (total)
+ SF USED    *        12.32 MB
+ GA USED    *         4.19 MB       (max)       0.93 MB       (current)
+ **********************************************************************************************************************************
+
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  JKFIT                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  MP2FIT                  
+ Basis size:   303
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  DFLHF                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ PROGRAM * SAPT 
+ Fix monomer properties
+
+ Geometry for monomer B:
+    1
+ AR  18.00      0.00000000      0.00000000     12.28321981
+ Nuclear attraction integrals written to record:     1002.3
+ Occupied orbitals of monomer B:     9
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      22       37.01       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700     2541     2542   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+                                         2541(1)  1800   
+                                                  GRID   
+
+              2       9       16.64       700     1000      520     2100     2101     2102     1800     2103     2104   
+                                         GEOM     BASIS   MCVARS     RHF      RHF      RHF     GRID      RKS      RKS  
+
+ PROGRAMS   *        TOTAL      SAPT     DF-KS       INT      SAPT     DF-KS       INT      SAPT      SAPT     DF-HF       INT
+ CPU TIMES  *        40.88      0.08      9.77      0.10      0.08      9.50      0.10     16.78      0.08      1.12      0.10
+ REAL TIME  *        23.99 SEC
+ DISK USED  *        55.46 MB (local),      110.91 MB (total)
+ SF USED    *        12.32 MB
+ GA USED    *         4.19 MB       (max)       0.93 MB       (current)
+ **********************************************************************************************************************************
+
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  JKFIT                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  MP2FIT                  
+ Basis size:   303
+ Attributes:
+ Sphericals:   T
+ Even tempered He S                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He P                       selected for group 3    nprim= 5    centre=  0.500    ratio= 2.500    dratio= 1.000
+ Even tempered He D                       selected for group 3    nprim= 3    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Even tempered He F                       selected for group 3    nprim= 2    centre=  0.300    ratio= 2.500    dratio= 1.000
+ Basis set:  DFLHF                   
+ Basis size:   299
+ Attributes:
+ Sphericals:   T
+
+ PROGRAM * SAPT      Authors: A. Hesselmann, G. Jansen, 2003
+
+ (Calculation of intermolecular interaction energy contributions
+  for single-determinant wave-functions)
+
+ Monomer A wave function in record             2103.2
+ Monomer A electrostatic potential in record   1001.3
+ Monomer B wave function in record             2104.2
+ Monomer B electrostatic potential in record   1002.3
+ Overlap matrix in record                      1000.3
+
+ Factor for nonlocal exchange:                  0.000000
+ Factor for VWN correlation in ALDA  kernel:    1.000000
+ Print factor:   0
+ Density fitting level:   3
+ Level of calculation:    3
+ Calculate exchange terms with infinite overlap expansion
+
+ CPKS solver:    0
+
+ Occupied space for monomer A:    5
+ Virtual  space for monomer A:  140
+
+ Occupied space for monomer B:    9
+ Virtual  space for monomer B:  136
+
+ Memory available:                          1400000000 words
+ Approximate memory needed for (P|fxc|ia):      288800 words
+ Approximate memory needed for E2disp:          487162 words
+ Approximate memory needed for E2exch-disp:     587885 words
+
+
+
+ Transform atomic integrals
+ ==========================
+ J/K matrices for monomer A
+ J/K matrices for monomer B
+ W matrix for monomer A
+ W matrix for monomer B
+
+ CPU time for integrals:       5.54 sec
+
+
+ Response calculations
+ - - - - - - - - - - - 
+ Norm: COULOMB             
+
+ Computing (ia|fxc|P) integrals...
+ XC-Kernel density threshold for (ia|fxc|P):  0.10000000E-07
+ XC-Kernel density threshold for (P|fxc|Q):   0.10000000E-05
+ Grid points per batch:      128
+
+ Number of grid points =   26904
+ center =    1    cpu time=      1.16 sec wall time      0.60 sec
+ center =    3    cpu time=      0.40 sec wall time      0.20 sec
+
+ CPU/Wall time for (ia|fxc|P) integrals:       1.57 sec      0.81 sec
+
+ Norm: COULOMB             
+
+ Computing (jb|fxc|P) integrals...
+ XC-Kernel density threshold for (ia|fxc|P):  0.10000000E-07
+ XC-Kernel density threshold for (P|fxc|Q):   0.10000000E-05
+ Grid points per batch:      128
+
+ Number of grid points =   26904
+ center =    1    cpu time=      1.06 sec wall time      0.58 sec
+ center =    3    cpu time=      0.59 sec wall time      0.30 sec
+
+ CPU/Wall time for (jb|fxc|P) integrals:       1.84 sec      1.08 sec
+
+
+
+ E1pol
+ =====
+ Internuclear repulsion            14.654138148554
+ E1pol =                           -0.000000021264
+
+ CPU time for E1pol:            0.00 sec
+
+
+ E1pol+E1exch
+ ============
+ E1INT(Sinf) =                     -0.000000020892
+ E1exch(Sinf) =                     0.000000000372
+
+ CPU time for E1exch(Sinf):       2.76 sec
+
+
+ Calculate fitting coefficients for E2disp/E2exch-disp...
+
+ ...using new fitting basis for E2disp/E2exch-disp...
+
+
+
+ E2disp
+ ======
+ Number of frequencies:  10
+ N^4 algorithm:           1
+ Norm: COULOMB             
+ Quadrature mode:         1
+
+ Number of grid points:    10
+   ngrid      omega         weight
+     1        0.013219        0.034223
+     2        0.072350        0.085930
+     3        0.190895        0.155357
+     4        0.395288        0.262108
+     5        0.740834        0.447794
+     6        1.349829        0.815898
+     7        2.529798        1.677461
+     8        5.238489        4.263284
+     9       13.821772       16.416104
+    10       75.647525      195.841842
+ imaginary frequency =    0.013219         CPU time =      0.15 sec      Wall time =      0.09 sec
+ imaginary frequency =    0.072350         CPU time =      0.14 sec      Wall time =      0.08 sec
+ imaginary frequency =    0.190895         CPU time =      0.15 sec      Wall time =      0.08 sec
+ imaginary frequency =    0.395288         CPU time =      0.14 sec      Wall time =      0.08 sec
+ imaginary frequency =    0.740834         CPU time =      0.15 sec      Wall time =      0.08 sec
+ imaginary frequency =    1.349829         CPU time =      0.15 sec      Wall time =      0.08 sec
+ imaginary frequency =    2.529798         CPU time =      0.15 sec      Wall time =      0.08 sec
+ imaginary frequency =    5.238489         CPU time =      0.14 sec      Wall time =      0.08 sec
+ imaginary frequency =   13.821772         CPU time =      0.15 sec      Wall time =      0.08 sec
+ imaginary frequency =   75.647525         CPU time =      0.14 sec      Wall time =      0.08 sec
+ E2disp =                          -0.000006372212
+
+ CPU time for (ia|jb) integrals:       0.03 sec
+
+ E2disp =                          -0.000006372212
+ E2disp(unc) =                     -0.000009632267
+
+ CPU time for E2disp:           4.30 sec
+
+
+ Induction B->A
+ ==============
+ E2ind[B->A](unc) =                -0.000000001868
+ E2ind[B->A] =                     -0.000000001867
+
+ Induction A->B
+ ==============
+ E2ind[A->B](unc) =                -0.000000000769
+ E2ind[A->B] =                     -0.000000000765
+
+ E2ind
+ =====
+ E2ind =                           -0.000000002633
+
+ CPU time for E2ind:            0.06 sec
+
+
+ E2ind+E2exch-ind
+ ================
+ E2IND(A<-B) =                     -0.000000000535
+ E2IND(B<-A) =                     -0.000000000118
+ E2IND =                           -0.000000000653
+ E2exch-ind(Sinf) =                 0.000000001980
+
+ CPU time for E2exch-ind:       2.77 sec
+
+
+ E2disp+E2exch-disp
+ ==================
+ E2DISP =                          -0.000006371435
+ E2exch-disp(Sinf) =                0.000000000776
+
+ CPU time for E2exch-disp:      0.78 sec
+
+
+
+
+ ===========
+ IMW Results
+ ===========
+                             [mH]                [kcal/mol]          [kJ/mol]
+ E1pol                      -0.00002126         -0.00001334         -0.00005583
+ E1exch                      0.00000037          0.00000023          0.00000098
+
+ E2ind(unc)                 -0.00000264         -0.00000165         -0.00000692
+ E2ind                      -0.00000263         -0.00000165         -0.00000691
+ E2ind-exch                  0.00000198          0.00000124          0.00000520
+
+ E2disp(unc)                -0.00963227         -0.00604434         -0.02528952
+ E2disp                     -0.00637221         -0.00399862         -0.01673024
+ E2disp-exch                 0.00000078          0.00000049          0.00000204
+
+ E1tot                      -0.00002089         -0.00001311         -0.00005485
+ E2tot                      -0.00637209         -0.00399855         -0.01672992
+ E1tot+E2tot                -0.00639298         -0.00401166         -0.01678477
+
+
+ **********************************************************************************************************************************
+ DATASETS  * FILE   NREC   LENGTH (MB)   RECORD NAMES
+              1      23       37.05       500      610      700      900      950      970     1000      129      960     1100   
+                                          VAR    BASINP    GEOM    SYMINP    ZMAT    AOBASIS   BASIS     P2S    ABASIS      S 
+                                         1400     1410     1200     1210     1080     1600     1650     1700     2541     2542   
+                                           T        V       H0       H01     AOSYM     SMH    MOLCAS    OPER   
+                                         2541(1)  1800     2542(1)
+                                                  GRID   
+
+              2       9       16.64       700     1000      520     2100     2101     2102     1800     2103     2104   
+                                         GEOM     BASIS   MCVARS     RHF      RHF      RHF     GRID      RKS      RKS  
+
+ PROGRAMS   *        TOTAL      SAPT      SAPT     DF-KS       INT      SAPT     DF-KS       INT      SAPT      SAPT     DF-HF
+ CPU TIMES  *        60.59     19.71      0.08      9.77      0.10      0.08      9.50      0.10     16.78      0.08      1.12
+ REAL TIME  *        34.56 SEC
+ DISK USED  *        60.49 MB (local),      115.94 MB (total)
+ SF USED    *        65.95 MB
+ GA USED    *         4.19 MB       (max)       0.93 MB       (current)
+ **********************************************************************************************************************************
+ SETTING EINT_DFTSAPT   =        -0.00639310  mH                              
+ Molecular orbitals read from record     2104.2  Type=RKS/CANONICAL (state 1.1)
+ Occupation numbers read from record     2104.2  Type=RKS/RHF (state 1.1)
+ Orbital energies read from record       2104.2  Type=RKS/CANONICAL (state 1.1)
+ Redundancy group numbers read from rec  2104.2  Type=RKS/RHF (state 1.1)
+
+ SAPT/USERDEF energy=      0.000000000000
+
+            SAPT           DF-KS            SAPT           DF-KS            SAPT           DF-HF            SAPT           DF-HF
+   -527.44568385   -527.44568385   -128.88838207   -128.88838207   -526.81339319   -526.81339319   -128.53330453   -128.53330453
+ **********************************************************************************************************************************
+ Molpro calculation terminated

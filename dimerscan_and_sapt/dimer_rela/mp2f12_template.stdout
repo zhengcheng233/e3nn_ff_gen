@@ -1,0 +1,2 @@
+0:0:fehler on processor   0                                         :: 1
+(rank:0 hostname:cn1201 pid:61519):ARMCI DASSERT fail. src/common/armci.c:ARMCI_Error():208 cond:0

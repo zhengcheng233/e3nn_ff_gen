@@ -1,0 +1,69 @@
+HEADER    
+TITLE     MDANALYSIS FRAME 0: Created by PDBWriter
+REMARK     1 CREATED WITH OPENMM 7.4.1, 2020-12-21
+CRYST1   30.000   30.000   30.000  90.00  90.00  90.00 P 1           1
+ATOM      1  C00 TER M   1      10.583  15.662  17.449  0.00  1.00      SYST C  
+ATOM      2  H01 TER M   1      10.761  16.221  16.489  0.00  1.00      SYST H  
+ATOM      3  H02 TER M   1       9.848  16.250  17.996  0.00  1.00      SYST H  
+ATOM      4  O03 TER M   1      11.842  15.375  18.014  0.00  1.00      SYST O  
+ATOM      5  C04 TER M   1      12.579  16.515  18.411  0.00  1.00      SYST C  
+ATOM      6  H05 TER M   1      12.740  17.287  17.684  0.00  1.00      SYST H  
+ATOM      7  H06 TER M   1      13.550  16.034  18.570  0.00  1.00      SYST H  
+ATOM      8  H07 TER M   1      12.106  16.960  19.322  0.00  1.00      SYST H  
+ATOM      9  C00 TER M   2      10.022  14.351  17.062  0.00  1.00      SYST C  
+ATOM     10  H01 TER M   2      10.104  13.696  17.933  0.00  1.00      SYST H  
+ATOM     11  H02 TER M   2      10.560  13.858  16.321  0.00  1.00      SYST H  
+ATOM     12  O03 TER M   2       8.685  14.518  16.588  0.00  1.00      SYST O  
+ATOM     13  C04 TER M   2       8.056  13.220  16.432  0.00  1.00      SYST C  
+ATOM     14  H05 TER M   2       7.061  13.307  16.054  0.00  1.00      SYST H  
+ATOM     15  H06 TER M   2       7.927  12.692  17.362  0.00  1.00      SYST H  
+ATOM     16  H07 TER M   2       8.514  12.567  15.668  0.00  1.00      SYST H  
+ATOM     17  C00 TER M   1      16.493  16.784  15.981  0.00  1.00      SYST C  
+ATOM     18  H01 TER M   1      17.214  17.540  16.047  0.00  1.00      SYST H  
+ATOM     19  H02 TER M   1      15.888  16.690  16.862  0.00  1.00      SYST H  
+ATOM     20  O03 TER M   1      17.032  15.556  15.594  0.00  1.00      SYST O  
+ATOM     21  C04 TER M   1      17.794  15.035  16.633  0.00  1.00      SYST C  
+ATOM     22  H05 TER M   1      18.089  14.109  16.191  0.00  1.00      SYST H  
+ATOM     23  H06 TER M   1      17.197  14.778  17.507  0.00  1.00      SYST H  
+ATOM     24  H07 TER M   1      18.650  15.718  16.957  0.00  1.00      SYST H  
+ATOM     25  C00 TER M   2      15.442  17.100  14.913  0.00  1.00      SYST C  
+ATOM     26  H01 TER M   2      14.584  16.544  15.166  0.00  1.00      SYST H  
+ATOM     27  H02 TER M   2      15.838  16.951  13.933  0.00  1.00      SYST H  
+ATOM     28  O03 TER M   2      14.958  18.392  15.134  0.00  1.00      SYST O  
+ATOM     29  C04 TER M   2      14.107  18.844  14.050  0.00  1.00      SYST C  
+ATOM     30  H05 TER M   2      13.885  19.904  14.331  0.00  1.00      SYST H  
+ATOM     31  H06 TER M   2      13.153  18.323  14.201  0.00  1.00      SYST H  
+ATOM     32  H07 TER M   2      14.535  18.643  13.035  0.00  1.00      SYST H  
+CONECT    1    2    3    4    9
+CONECT    2    1
+CONECT    3    1
+CONECT    4    1    5
+CONECT    5    4    6    7    8
+CONECT    6    5
+CONECT    7    5
+CONECT    8    5
+CONECT    9    1   10   11   12
+CONECT   10    9
+CONECT   11    9
+CONECT   12    9   13
+CONECT   13   12   14   15   16
+CONECT   14   13
+CONECT   15   13
+CONECT   16   13
+CONECT   17   18   19   20   25
+CONECT   18   17
+CONECT   19   17
+CONECT   20   17   21
+CONECT   21   20   22   23   24
+CONECT   22   21
+CONECT   23   21
+CONECT   24   21
+CONECT   25   17   26   27   28
+CONECT   26   25
+CONECT   27   25
+CONECT   28   25   29
+CONECT   29   28   30   31   32
+CONECT   30   29
+CONECT   31   29
+CONECT   32   29
+END

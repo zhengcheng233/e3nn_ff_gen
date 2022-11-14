@@ -1,0 +1,205 @@
+<?xml version="1.0"?>
+<molpro xmlns="http://www.molpro.net/schema/molpro-output"
+  xmlns:xsd="http://www.w3.org/1999/XMLSchema"
+  xmlns:cml="http://www.xml-cml.org/schema"
+  xmlns:stm="http://www.xml-cml.org/schema"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+ <!--
+
+ Primary working directories    : /tmp/44208/molpro.Pntl8k226a
+ Secondary working directories  : /tmp/44208/molpro.Pntl8k226a
+ Wavefunction directory         : /share/home/kuangy/wfu/
+ Main file repository           : /tmp/44208/molpro.Pntl8k226a/
+
+ id        : qhszyk
+
+ Nodes     nprocs
+ cn1201       6
+
+ Using customized tuning parameters: mindgm=1; mindgv=20; mindgc=4; mindgr=1; noblas=0; minvec=7
+ default implementation of scratch files=sf  
+
+
+ Variables initialized (934), CPU time= 0.01 sec
+ --><job>
+  <!--
+ memory,800,m
+ gdirect; gthresh,energy=1.d-8,orbital=1.d-8,grid=1.d-8
+ spherical
+ angstrom
+ symmetry,nosym
+ orient,noorient
+ geometry={
+ 1,Ne,,0.0,0.0,0.0
+ 2,Ar,,0.0,0.0,6.5
+ }
+ basis={
+ set,orbital
+ default=avtz                                                                    !for orbitals
+ s,He,even,nprim=5,ratio=2.5,center=0.5
+ p,He,even,nprim=5,ratio=2.5,center=0.5
+ d,He,even,nprim=3,ratio=2.5,center=0.3
+ f,He,even,nprim=2,ratio=2.5,center=0.3
+ set,jkfit
+ default=avtz/jkfit                                                              !for JK integrals
+ s,He,even,nprim=5,ratio=2.5,center=0.5
+ p,He,even,nprim=5,ratio=2.5,center=0.5
+ d,He,even,nprim=3,ratio=2.5,center=0.3
+ f,He,even,nprim=2,ratio=2.5,center=0.3
+ set,mp2fit
+ default=avtz/mp2fit                                                             !for E2disp/E2exch-disp
+ s,He,even,nprim=5,ratio=2.5,center=0.5
+ p,He,even,nprim=5,ratio=2.5,center=0.5
+ d,He,even,nprim=3,ratio=2.5,center=0.3
+ f,He,even,nprim=2,ratio=2.5,center=0.3
+ set,dflhf
+ default=avtz/jkfit                                                              !for LHF
+ s,He,even,nprim=5,ratio=2.5,center=0.5
+ p,He,even,nprim=5,ratio=2.5,center=0.5
+ d,He,even,nprim=3,ratio=2.5,center=0.3
+ f,He,even,nprim=2,ratio=2.5,center=0.3
+ }
+ 
+                                                                                 !dimer
+ dummy,3
+ df-hf, df_basis=jkfit
+ df-mp2-f12, df_basis=mp2fit
+ edm=energy
+ 
+                                                                                 !monomer A
+ dummy,2,3
+ df-hf, df_basis=jkfit
+ df-mp2-f12, df_basis=mp2fit
+ ema=energy
+ {sapt;monomerA}
+ 
+                                                                                 !monomer B
+ dummy,1,3
+ df-hf, df_basis=jkfit
+ df-mp2-f12, df_basis=mp2fit
+ emb=energy
+ 
+ eint=edm-ema-emb
+ Commands  initialized (763), CPU time= 0.01 sec, 617 directives.
+ Default parameters read. Elapsed time= 0.09 sec
+
+ Checking input...
+ Passed
+1
+
+
+                                         ***  PROGRAM SYSTEM MOLPRO  ***
+                                       Copyright, TTI GmbH Stuttgart, 2015
+                                    Version 2019.2 linked Oct 25 2019 22:50:27
+
+
+ **********************************************************************************************************************************
+ LABEL *                                                                                 
+  (2 PROC) 64 bit mpp version                                                            DATE: 23-Dec-20          TIME: 10:35:37  
+ **********************************************************************************************************************************
+
+ SHA1:             8dbd9ae1082e4ce945b0f27595c9eb2d4aa09004
+ **********************************************************************************************************************************
+  -->
+  <!--
+
+ THRESHOLDS:
+
+ ZERO    =  1.00D-12  ONEINT  =  1.00D-12  TWOINT  =  1.00D-11  PREFAC  =  1.00D-14  XXXXXX  =  1.00D-09  EORDER  =  1.00D-04
+ ENERGY  =  1.00D-08  ETEST   =  0.00D+00  EDENS   =  0.00D+00  THRDEDEF=  1.00D-06  GRADIENT=  1.00D-02  STEP    =  1.00D-03
+ ORBITAL =  1.00D-08  CIVEC   =  1.00D-05  COEFF   =  1.00D-04  PRINTCI =  5.00D-02  PUNCHCI =  9.90D+01  OPTGRAD =  3.00D-04
+ OPTENERG=  1.00D-06  OPTSTEP =  3.00D-04  THRGRAD =  1.00D-10  COMPRESS=  1.00D-11  VARMIN  =  1.00D-07  VARMAX  =  1.00D-03
+ THRDOUB =  0.00D+00  THRDIV  =  1.00D-05  THRRED  =  1.00D-07  THRPSP  =  1.00D+00  THRDC   =  1.00D-10  THRCS   =  1.00D-10
+ THRNRM  =  1.00D-08  THREQ   =  0.00D+00  THRDE   =  1.00D+00  THRREF  =  1.00D-05  SPARFAC =  1.00D+00  THRDLP  =  1.00D-07
+ THRDIA  =  1.00D-10  THRDLS  =  1.00D-07  THRGPS  =  0.00D+00  THRKEX  =  0.00D+00  THRDIS  =  2.00D-01  THRVAR  =  1.00D-10
+ THRLOC  =  1.00D-06  THRGAP  =  1.00D-06  THRLOCT = -1.00D+00  THRGAPT = -1.00D+00  THRORB  =  1.00D-06  THRMLTP =  0.00D+00
+ THRCPQCI=  1.00D-10  KEXTA   =  0.00D+00  THRCOARS=  0.00D+00  SYMTOL  =  1.00D-06  GRADTOL =  1.00D-06  THROVL  =  1.00D-08
+ THRORTH =  1.00D-08  GRID    =  1.00D-08  GRIDMAX =  1.00D-03  DTMAX   =  0.00D+00  THROCCDE=  1.00D-01  THROCCDE=  1.00D-01
+ THRPRINT=  2.50D-01
+
+
+ Variable memory set to  800000000 words,  buffer space 
+
+ ZSYMEL=NOSYM
+ ZUNIT=ANG
+
+ SETTING BASIS          =    USERDEF
+ ILLEGAL Z-MATRIX ROW SPECIFIED ON DUMMY CARD:   3
+  --><error/><!--
+  -->
+  <stm:metadataList>
+   <stm:metadata name="dc:date" content="2020-12-23T10:35:37+08:00"/>
+   <stm:metadata name="dc:creator" content="kuangy"/>
+   <stm:metadata name="cmlm:insilico" content="Molpro"/>
+  </stm:metadataList>
+  <platform>
+   <version major="2019" minor="2" SHA="8dbd9ae1082e4ce945b0f27595c9eb2d4aa09004"
+     integer_bits="64" parallelism="mpp">
+    2019.2
+    <date year="2020" month="12" day="23" hour="10" minute="35" second="37">
+     2020-12-23T10:35:37
+    </date>
+   </version>
+   <licence id="qhszyk"/>
+   <parallel processes="6" nodes="1" all_processes="6" openmp="2"/>
+   <machine hostname="cn1201"/>
+  </platform>
+  <input>
+   <p>memory,800,m</p>
+   <p>gdirect; gthresh,energy=1.d-8,orbital=1.d-8,grid=1.d-8</p>
+   <p>spherical</p>
+   <p>angstrom</p>
+   <p>symmetry,nosym</p>
+   <p>orient,noorient</p>
+   <p>geometry={</p>
+   <p>1,Ne,,0.0,0.0,0.0</p>
+   <p>2,Ar,,0.0,0.0,6.5</p>
+   <p>}</p>
+   <p>basis={</p>
+   <p>set,orbital</p>
+   <p>default=avtz         !for orbitals</p>
+   <p>s,He,even,nprim=5,ratio=2.5,center=0.5</p>
+   <p>p,He,even,nprim=5,ratio=2.5,center=0.5</p>
+   <p>d,He,even,nprim=3,ratio=2.5,center=0.3</p>
+   <p>f,He,even,nprim=2,ratio=2.5,center=0.3</p>
+   <p>set,jkfit</p>
+   <p>default=avtz/jkfit   !for JK integrals</p>
+   <p>s,He,even,nprim=5,ratio=2.5,center=0.5</p>
+   <p>p,He,even,nprim=5,ratio=2.5,center=0.5</p>
+   <p>d,He,even,nprim=3,ratio=2.5,center=0.3</p>
+   <p>f,He,even,nprim=2,ratio=2.5,center=0.3</p>
+   <p>set,mp2fit</p>
+   <p>default=avtz/mp2fit  !for E2disp/E2exch-disp</p>
+   <p>s,He,even,nprim=5,ratio=2.5,center=0.5</p>
+   <p>p,He,even,nprim=5,ratio=2.5,center=0.5</p>
+   <p>d,He,even,nprim=3,ratio=2.5,center=0.3</p>
+   <p>f,He,even,nprim=2,ratio=2.5,center=0.3</p>
+   <p>set,dflhf</p>
+   <p>default=avtz/jkfit   !for LHF</p>
+   <p>s,He,even,nprim=5,ratio=2.5,center=0.5</p>
+   <p>p,He,even,nprim=5,ratio=2.5,center=0.5</p>
+   <p>d,He,even,nprim=3,ratio=2.5,center=0.3</p>
+   <p>f,He,even,nprim=2,ratio=2.5,center=0.3</p>
+   <p>}</p>
+   <p>!dimer</p>
+   <p>dummy,3</p>
+   <p>df-hf, df_basis=jkfit</p>
+   <p>df-mp2-f12, df_basis=mp2fit</p>
+   <p>edm=energy</p>
+   <p>!monomer A</p>
+   <p>dummy,2,3</p>
+   <p>df-hf, df_basis=jkfit</p>
+   <p>df-mp2-f12, df_basis=mp2fit</p>
+   <p>ema=energy</p>
+   <p>{sapt;monomerA}</p>
+   <p>!monomer B</p>
+   <p>dummy,1,3</p>
+   <p>df-hf, df_basis=jkfit</p>
+   <p>df-mp2-f12, df_basis=mp2fit</p>
+   <p>emb=energy</p>
+   <p>eint=edm-ema-emb</p>
+  </input>
+  <diagnostics warnings="0"/>
+  <!--
+ --></job><!--
+--></molpro>
