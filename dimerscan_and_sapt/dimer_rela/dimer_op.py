@@ -20,17 +20,17 @@ def get_dimer(f_name):
     homo_a = data['homo_a']; homo_b = data['homo_b']
     return coords, symbols, monA_idx, monB_idx, bondA_idx, bondB_idx, ip_a, ip_b, homo_a, homo_b
 
-def gen_molpro_output(u, monA, monB, template_fn, ac_data, ofn=None, label=None):
+def gen_molpro_output(coord, symbol, monA_idx, monB_idx, template_fn, ac_data, ofn=None, label=None):
     if ofn is None:
         ofile = sys.stdout
     else:
         ofile = open(ofn, 'w')
     if label is not None:
         print('! %s'%label, file=ofile)
-    indices_A = np.array(range(1, len(monA)+1))
-    indices_B = np.array(range(len(monA)+1, len(monA)+len(monB)+1))
-    n_atoms_tot = len(monA) + len(monB)
-    r_midbond = u.atoms.center_of_mass()
+    indices_A = np.array(range(1, len(monA_idx)+1))
+    indices_B = np.array(range(len(monA_idx)+1, len(monA_idx)+len(monB_idx)+1))
+    n_atoms_tot = len(monA_idx) + len(monB_idx)
+    r_midbond = mass_center(coord,symbol)
     with open(template_fn) as ifile:
         iread = 0
         for line in ifile:
@@ -40,9 +40,8 @@ def gen_molpro_output(u, monA, monB, template_fn, ac_data, ofn=None, label=None)
                 continue
             if iread == 1 and '}' in line:
                 i_atom = 1
-                for a in monA + monB:
-                    r = a.position
-                    print('%d,%s,,%.8f,%.8f,%.8f'%(i_atom, a.type, r[0], r[1], r[2]), file=ofile)
+                for ele,r in zip(symbol,coord):
+                    print('%d,%s,,%.8f,%.8f,%.8f'%(i_atom, ele, r[0], r[1], r[2]), file=ofile)
                     i_atom += 1
                 print('%d,He,,%.8f,%.8f,%.8f'%(i_atom, r_midbond[0], r_midbond[1], r_midbond[2]), file=ofile)
                 print(line, end='', file=ofile)
@@ -152,81 +151,19 @@ def gen_scan(coord, symbol, monA_idx, monB_idx, bondA_idx, bondB_idx):
             + list(np.arange(i_switch2, i_max, (i_max-i_switch2)/3))
     positons = []
     for i in indices:
-        
-
-def gen_scan(u, monA, monB):
-    dr = 1
-    r_min = 1.4
-    r_max = 6.2
-    # r_min = 1.6
-    # r_max = 6.5
-    n_atoms1 = len(monA)
-    n_atoms2 = len(monB)
-    i, j, min_dr = find_closest_distance(u, monA, monB)
-    dr_com = monB.center_of_mass() - monA.center_of_mass()
-    dn_com = dr_com / np.linalg.norm(dr_com)
-    indices = [0]
-    positions = [u.atoms.positions]
-    pos0 = copy.deepcopy(u.atoms.positions)
-    i = 0
-    di = 0.1
-    while min_dr > r_min:
-        i -= di
         pos = copy.deepcopy(pos0)
-        pos[n_atoms1:] += dn_com * dr * i
-        u.atoms.positions = pos
-        _, _, min_dr = find_closest_distance(u, monA, monB)
-        if min_dr < r_min:
-            break
-    i_min = i + di
-    i = 0
-    while min_dr < r_max:
-        i += di
-        pos = copy.deepcopy(pos0)
-        pos[n_atoms1:] += dn_com * dr * i
-        u.atoms.positions = pos
-        _, _, min_dr = find_closest_distance(u, monA, monB)
-        if min_dr > r_max:
-            break
-    i_max = i - di
-    i_switch1 = i_min + (i_max-i_min)/6
-    i_switch2 = i_min + (i_max-i_min)*3/6
-    indices = list(np.arange(i_min, i_switch1, (i_switch1-i_min)/4)) \
-            + list(np.arange(i_switch1, i_switch2, (i_switch2-i_switch1)/4)) \
-            + list(np.arange(i_switch2, i_max, (i_max-i_switch2)/4))
-    positions = []
-    for i in indices:
-        pos = copy.deepcopy(pos0)
-        pos[n_atoms1:] += dn_com * dr * i
-        positions.append(pos)
-    # while min_dr > r_min:
-    #     pos = copy.deepcopy(pos0)
-    #     pos[n_atoms1:] += dn_com * dr * i
-    #     u.atoms.positions = pos
-    #     _, _, min_dr = find_closest_distance(u, monA, monB)
-    #     if min_dr > r_min:
-    #         indices = [i] + indices
-    #         positions = [pos] + positions
-    #     i -= 1
-    # i = 1
-    # while min_dr < r_max:
-    #     pos = copy.deepcopy(pos0)
-    #     pos[n_atoms1:] += dn_com * dr * i
-    #     u.atoms.positions = pos
-    #     _, _, min_dr = find_closest_distance(u, monA, monB)
-    #     if min_dr < r_max:
-    #         indices.append(i)
-    #         positions.append(pos)
-    #     i += 1
+        pos += dn_com * dr * i
+        coord[-len(pos):] = pos
+        positions.append(coord)
     return indices, positions
     
-def gen_gjf(u, ofn=None):
+def gen_gjf(pos, symbol,ofn=None):
     if ofn is None:
         ofile = sys.stdout
     else:
         ofile = open(ofn, 'w')
     print("# HF/6-31G(d)\n\ntitle\n\n0 1", file=ofile)
-    for atom in u.atoms:
+    for elem,r in zip(symbol,pos):
         elem = atom.type
         r = atom.position
         print('%3s%15.8f%15.8f%15.8f'%(elem, r[0], r[1], r[2]), file=ofile)
@@ -253,24 +190,8 @@ if __name__ == '__main__':
     coords, symbols, monA_idx, monB_idx, bondA_idx, bondB_idx, ip_a, ip_b, homo_a, homo_b = get_dimer(f_name)
     # scan the dimer geometry provided according to i_frame
     coord = coords[i_frame]; symbol = symbols[i_frame]
-    gen_scan(coord,symbol,monA_idx,monB_idx,bondA_idx,bondB_idx) 
+    indices, positions = gen_scan(coord,symbol,monA_idx,monB_idx,bondA_idx,bondB_idx) 
 
-    i_frame = int(sys.argv[1])
-    u, monA, monB = get_dimer('peg2_dimer.pdb', 'output.pdb')
-    if i_frame == -1: # -1 means scan the dimer geometry provided in command line argument
-        i_frame = 0
-        u0 = mda.Universe(sys.argv[2])
-        pos_mon = u0.atoms.positions
-        shift = np.array([5.0, 0, 0])
-        u.atoms.positions = np.vstack((pos_mon, pos_mon + shift))
-    else:   # otherwise pick a frame in the trajectory output.pdb
-        ts = u.trajectory[i_frame]
-    
-    
-    u.dimensions = np.array([30, 30, 30, 90, 90, 90])
-    # IP, and HOMO energy for each monomer, at extended minimum geometries
-    ac_data = np.array([[0.220086, -0.139377], [0.220086, -0.139377]])
-    indices, positions = gen_scan(u, monA, monB)
     n_data = len(indices)
     folder_gjf = clean_folder(i_frame, 'gjfs')
     folder_sapt = clean_folder(i_frame, 'sapt')
@@ -278,20 +199,20 @@ if __name__ == '__main__':
     folder_pdb = clean_folder(i_frame, 'pdb')
     for i_data in range(n_data):
         pos = positions[i_data]
-        u.atoms.positions = pos
+         
 
         # generate gjf files for visualization
         ofn = folder_gjf + '/' + padding(i_data) + '.gjf'
-        gen_gjf(u, ofn)
+        gen_gjf(pos, symbol, ofn)
 
         # write pdb
-        ofn = folder_pdb + '/' + padding(i_data) + '.pdb'
-        u.atoms.write(ofn)
+        #ofn = folder_pdb + '/' + padding(i_data) + '.pdb'
+        #u.atoms.write(ofn)
 
         # generate sapt file
         ofn = folder_sapt + '/' + padding(i_data) + '.com'
-        gen_molpro_output(u, monA, monB, 'sapt_template.com', ac_data, ofn=ofn, label='shift= %.6f'%indices[i_data])
+        gen_molpro_output(pos, symbol, monA_idx, monB_idx, 'sapt_template.com', np.array([[ip_a,homo_a],[ip_b,homo_b]]), ofn=ofn, label='shift= %.6f'%indices[i_data])
 
         # # generate mp2 file
         ofn = folder_mp2 + '/' + padding(i_data) + '.com'
-        gen_molpro_output(u, monA, monB, 'mp2_template.com', ac_data, ofn=ofn, label='shift = %.6f'%indices[i_data])
+        gen_molpro_output(pos, symbol, monA_idx, monB_idx, 'mp2_template.com', np.array([[ip_a,homo_a],[ip_b,homo_b]]), ofn=ofn, label='shift = %.6f'%indices[i_data])
