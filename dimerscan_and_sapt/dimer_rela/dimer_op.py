@@ -10,6 +10,9 @@ import numpy as np
 import MDAnalysis as mda
 import copy
 import os
+import ase
+
+atomic_masses = ase.data.atomic_masses
 
 def get_dimer(f_name):
     data = np.load(f_name,allow_pickle=True)
@@ -113,8 +116,9 @@ def find_closest_distance(coord_A, coord_B):
     return min_i, min_j, min_dr
 
 def mass_center(coord,symbol):
-    symbol = symbol.reshape(-1,1)
-    return np.sum(coord * symbol, axis=0)/np.sum(symbol)
+    mol_mass = [atomic_masses[u] for u in symbol]
+    mol_mass = np.array(mol_mass).reshape(-1,1)
+    return np.sum(coord * mol_mass, axis=0)/np.sum(mol_mass)
    
 
 def gen_scan(coord, symbol, monA_idx, monB_idx, bondA_idx, bondB_idx):
