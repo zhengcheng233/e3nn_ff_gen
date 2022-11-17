@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+using kcal/mol for energies, K for temperatures, g/mol for masses, and ang for distance
+"""
 import os 
 import numpy as np
 import sys
@@ -46,12 +49,16 @@ class Parameters:
         self.masses = masses
 
 class Myclass():
-    def __init__(self, config, atom_types, parameters, r_max=None, device = "cuda:0"):
+    def __init__(self, config, atom_types, parameters, center_point, indices, spring, threshold, r_max=None, device = "cuda:0"):
         # information such as masses, used by the integrator
         self.par = parameters
         self.atom_types = atom_types
         self.model = build(config).to(device)
         self.n_nodes = torch.ones((1, 1), dtype=torch.long)* atom_types.shape[0]
+        self.center_point = center_point
+        self.indices = indices
+        self.spring = spring
+        self.threshold = threshold 
         if r_max is None:
             self.r_max = config.r_max
         else:
@@ -65,9 +72,26 @@ class Myclass():
         attrs.update(_attrs)
         batch = Batch(attrs, **data).to(device)
         batch = self.model(batch)
-        forces[0, :] = batch['forces'].detach() * 23.0605426
-        return [batch['energy'].item()]
 
+        # add hookean potential here, the formula is like 10000*max(0,r-0.6)**2; r = \
+        # sqrt((x - 1.5)^2 + (y - 1.5)^2 + (z - 1.5)^2) 
+
+        add_forces = np.zeros((len(self.atom_types),3),dtype=np.float32)
+        atom_dis = np.sqrt(np.sum((pos[self.indices] - self.center_point)**2,axis=1))
+        add_indices = np.where(atom_dis > self.threshold)[0]
+
+        if len(add_indices) > 0: 
+            # unit: self.spring eV/A**2; coordinate angstrom
+            for idx in add_indices:
+                magnitude = self.spring * (atom_dis[idx] - self.threshold)
+                assert(magnitude >= 0.)
+                direction = (self.center_point - pos[self.indices[idx]]) / np.linalg.norm(self.center_point - pos[self.indices[idx]])
+                add_forces[self.indices[idx]] = direction * magnitude
+            
+            add_forces = np.array(add_forces,dtype=np.float32) * np.array(23.0605426,dtype=np.float32)
+        
+        forces[0, :] = batch['forces'].detach() * np.array(23.0605426,dtype=np.float32) + add_forces
+        return [batch['energy'].item()]
 
 precision = torch.float
 device = "cuda:0"
@@ -75,6 +99,8 @@ device = "cuda:0"
 mass = {'H':1.00794,'C':12.0107,'N':14.0067,'O':15.9994,'S':32.065}
 sym_dict = {'H':1,'C':6,'N':7,'O':8,'S':16}
 lmp_map = ["C","H","N","O","S"]; flag = False
+threshold = 6  
+spring = 1.04  
 lmp_type = []
 
 mol_coords = []; mol_atypes = []; mol_masses = []
@@ -98,6 +124,9 @@ mol_atypes = np.array(mol_atypes,dtype=np.int64)
 mol_masses = np.array(mol_masses)
 mol_coords = np.array(mol_coords).reshape((mol_numAtoms,3,1))
 if int(do_md) == 1:
+    def init_infor():
+        return center_point, indices, spring
+
     parameters = Parameters(mol_masses, mol_atypes, precision=precision, device=device)
 
     system = System(mol_numAtoms, nreplicas=1, precision=precision, device=device)
@@ -108,7 +137,8 @@ if int(do_md) == 1:
     config = configs.config_energy_force().model_config
     #config.n_dim = 32
     atom_types = torch.tensor((mol_atypes))
-    forces = Myclass(config, atom_types, parameters)
+    
+    forces = Myclass(config, atom_types, parameters, center_point, indices, spring, threshold)
     state_dict = torch.load('../best.000.pt', map_location=device)
     model_state_dict = {}
     for key, value in state_dict.items():
