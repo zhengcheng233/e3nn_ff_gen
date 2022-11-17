@@ -120,12 +120,35 @@ with open('conf.lmp','r') as fp:
                 mol_masses.append(mass[lmp_map[int(line[1])-1]])
                 lmp_type.append(int(line[1]))
 
+monomer_atoms_n = []
+with open('conf.num','r') as fp:
+    for line in fp:
+        line = line.strip().split()
+        monomer_atoms_n.append(int(line[0]))
+
 mol_atypes = np.array(mol_atypes,dtype=np.int64)
 mol_masses = np.array(mol_masses)
 mol_coords = np.array(mol_coords).reshape((mol_numAtoms,3,1))
 if int(do_md) == 1:
-    def init_infor():
-        return center_point, indices, spring
+    def init_infor(mol_masses,mol_coords,mol_atypes, monomer_atoms_n):
+        mass_0 = mol_masses[0:monomer_atoms_n[0]]; mass_1 = mol_masses[monomer_atoms_n[0]:]
+        coord_0 = mol_coords[0:monomer_atoms_n[0]]; coord_1 = mol_coords[monomer_atoms_n[0]:]
+        mol_type_0 = mol_atypes[0:monomer_atoms_n[0]]; mol_type_1 = mol_atypes[monomer_atoms_n[0]:]
+
+        mass_cen_0 = np.sum(coord_0 * mass_0.reshape(-1,1),axis=0)/np.sum(mass_0)
+        mass_cen_1 = np.sum(coord_1 * mass_1.reshape(-1,1),axis=0)/np.sum(mass_1)
+        center_point = (mass_cen_0 + mass_cen_1)/2.
+        idx_0 = np.argsort(np.sum((coord_0 - mass_cen_0)**2,axis=1))
+        idx_1 = np.argsort(np.sum((coord_1 - mass_cen_1)**2,axis=1))
+        for idx in idx_0:
+            if mol_type_0[idx] > 1:
+                indices.append(idx)
+                break
+        for idx in idx_1:
+            if mol_type_1[idx] > 1:
+                indices.append(idx + monomer_atoms_n[0])
+                break
+        return center_point, indices
 
     parameters = Parameters(mol_masses, mol_atypes, precision=precision, device=device)
 
