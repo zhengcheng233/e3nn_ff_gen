@@ -129,8 +129,10 @@ with open('conf.num','r') as fp:
 mol_atypes = np.array(mol_atypes,dtype=np.int64)
 mol_masses = np.array(mol_masses)
 mol_coords = np.array(mol_coords).reshape((mol_numAtoms,3,1))
+
 if int(do_md) == 1:
     def init_infor(mol_masses,mol_coords,mol_atypes, monomer_atoms_n):
+        mol_coords = mol_coords.reshape((len(mol_coords),3))
         mass_0 = mol_masses[0:monomer_atoms_n[0]]; mass_1 = mol_masses[monomer_atoms_n[0]:]
         coord_0 = mol_coords[0:monomer_atoms_n[0]]; coord_1 = mol_coords[monomer_atoms_n[0]:]
         mol_type_0 = mol_atypes[0:monomer_atoms_n[0]]; mol_type_1 = mol_atypes[monomer_atoms_n[0]:]
@@ -140,6 +142,7 @@ if int(do_md) == 1:
         center_point = (mass_cen_0 + mass_cen_1)/2.
         idx_0 = np.argsort(np.sum((coord_0 - mass_cen_0)**2,axis=1))
         idx_1 = np.argsort(np.sum((coord_1 - mass_cen_1)**2,axis=1))
+        indices = []
         for idx in idx_0:
             if mol_type_0[idx] > 1:
                 indices.append(idx)
@@ -149,6 +152,8 @@ if int(do_md) == 1:
                 indices.append(idx + monomer_atoms_n[0])
                 break
         return center_point, indices
+
+    center_point, indices = init_infor(mol_masses,mol_coords,mol_atypes, monomer_atoms_n)
 
     parameters = Parameters(mol_masses, mol_atypes, precision=precision, device=device)
 
