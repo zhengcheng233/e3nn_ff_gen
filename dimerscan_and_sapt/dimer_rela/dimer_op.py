@@ -199,8 +199,6 @@ if __name__ == '__main__':
     folder_pdb = clean_folder(i_frame, 'pdb')
     for i_data in range(n_data):
         pos = positions[i_data]
-         
-
         # generate gjf files for visualization
         ofn = folder_gjf + '/' + padding(i_data) + '.gjf'
         gen_gjf(pos, symbol, ofn)
