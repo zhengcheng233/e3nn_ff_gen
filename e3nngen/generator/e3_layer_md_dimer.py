@@ -55,7 +55,7 @@ class Myclass():
         self.atom_types = atom_types
         self.model = build(config).to(device)
         self.n_nodes = torch.ones((1, 1), dtype=torch.long)* atom_types.shape[0]
-        self.center_point = center_point
+        self.center_point = torch.as_tensor(torch.from_numpy(center_point),dtype=torch.float,device=device)
         self.indices = indices
         self.spring = spring
         self.threshold = threshold 
@@ -72,25 +72,22 @@ class Myclass():
         attrs.update(_attrs)
         batch = Batch(attrs, **data).to(device)
         batch = self.model(batch)
-
         # add hookean potential here, the formula is like 10000*max(0,r-0.6)**2; r = \
         # sqrt((x - 1.5)^2 + (y - 1.5)^2 + (z - 1.5)^2) 
-
-        add_forces = np.zeros((len(self.atom_types),3),dtype=np.float32)
-        atom_dis = np.sqrt(np.sum((pos[self.indices] - self.center_point)**2,axis=1))
-        add_indices = np.where(atom_dis > self.threshold)[0]
-
+        add_forces = torch.zeros([len(self.atom_types),3],dtype=torch.float,device=device)
+        atom_dis = torch.linalg.norm(pos[0][self.indices] - self.center_point,axis=1)
+        add_indices = torch.where(atom_dis > self.threshold)[0]
+             
         if len(add_indices) > 0: 
             # unit: self.spring eV/A**2; coordinate angstrom
             for idx in add_indices:
                 magnitude = self.spring * (atom_dis[idx] - self.threshold)
                 assert(magnitude >= 0.)
-                direction = (self.center_point - pos[self.indices[idx]]) / np.linalg.norm(self.center_point - pos[self.indices[idx]])
+                direction = (self.center_point - pos[0][self.indices[idx]]) / torch.linalg.norm(self.center_point - pos[0][self.indices[idx]])
                 add_forces[self.indices[idx]] = direction * magnitude
-            
-            add_forces = np.array(add_forces,dtype=np.float32) * np.array(23.0605426,dtype=np.float32)
+            add_forces *= 23.060543
         
-        forces[0, :] = batch['forces'].detach() * np.array(23.0605426,dtype=np.float32) + add_forces
+        forces[0, :] = batch['forces'].detach() * 23.060543 + add_forces
         return [batch['energy'].item()]
 
 precision = torch.float
@@ -191,6 +188,7 @@ if int(do_md) == 1:
 
     iterator = tqdm(range(1, int(steps / output_period) + 1))
     Epot = forces.compute(system.pos, system.box, system.forces)
+
     try:
         for i in iterator:
             Ekin, Epot, T = integrator.step(niter=output_period)

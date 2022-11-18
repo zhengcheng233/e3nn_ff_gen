@@ -2415,7 +2415,7 @@ def model_devi_vs_err_adjust_loose(jdata):
         else:
             temps = T_list[idx_temps+1]; _idx += 1
             jdata['all_sys_idx_loose'] = all_sys_idx
-        md_num = 0
+            md_num = 0
 
     jdata['md_num'] = md_num
     
