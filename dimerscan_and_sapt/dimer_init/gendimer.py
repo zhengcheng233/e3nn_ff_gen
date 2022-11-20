@@ -82,9 +82,9 @@ def data_write(coord_A, symbol_A, coord_B, symbol_B, bond_infor_A, bond_infor_B,
         fp.write('\n'); fp.write('DPGEN'+'\n')
         fp.write('\n'); fp.write('%s 1' %(str(proton_A+proton_B))+'\n')
         for ss,cc in zip(symbol_A,coord_A):
-            fp.write('%s %s %s %s' %(ss,cc[0],cc[1],cc[2])+'\n')
+            fp.write('%s %.5f %.5f %.5f' %(ss,cc[0],cc[1],cc[2])+'\n')
         for ss,cc in zip(symbol_B,coord_B):        
-            fp.write('%s %s %s %s' %(ss,cc[0],cc[1],cc[2])+'\n')
+            fp.write('%s %.5f %.5f %.5f' %(ss,cc[0],cc[1],cc[2])+'\n')
         fp.write('\n')
     with open('dimer_topo.txt','w') as fp:
          fp.write('bond_idx_0; bond_idx_1; bond_type; proton_idx_0; proton_idx_1; bond_length'+'\n')
