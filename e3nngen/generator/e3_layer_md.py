@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+using kcal/mol for energies, K for temperatures, g/mol for masses, and ang for distance
+"""
 import os 
 import numpy as np
 import sys
@@ -45,7 +48,49 @@ class Parameters:
         masses.unsqueeze_(1)
         self.masses = masses
 
-class Myclass():
+class Dimerclass():
+    def __init__(self, config, atom_types, parameters, center_point, indices, spring, threshold, r_max=None, device = "cuda:0"):
+        # information such as masses, used by the integrator
+        self.par = parameters
+        self.atom_types = atom_types
+        self.model = build(config).to(device)
+        self.n_nodes = torch.ones((1, 1), dtype=torch.long)* atom_types.shape[0]
+        self.center_point = torch.as_tensor(torch.from_numpy(center_point),dtype=torch.float,device=device)
+        self.indices = indices
+        self.spring = spring
+        self.threshold = threshold 
+        if r_max is None:
+            self.r_max = config.r_max
+        else:
+            self.r_max = r_max
+
+    def compute(self, pos, box, forces, device = "cuda:0"):
+        data = {'pos': pos[0], 'species': self.atom_types, '_n_nodes': self.n_nodes}
+        attrs = {'pos': ('node', '1x1o'), 'species': ('node','1x0e')}
+        _data, _attrs = computeEdgeIndex(data, attrs, r_max=self.r_max)
+        data.update(_data)
+        attrs.update(_attrs)
+        batch = Batch(attrs, **data).to(device)
+        batch = self.model(batch)
+        # add hookean potential here, the formula is like 10000*max(0,r-0.6)**2; r = \
+        # sqrt((x - 1.5)^2 + (y - 1.5)^2 + (z - 1.5)^2) 
+        add_forces = torch.zeros([len(self.atom_types),3],dtype=torch.float,device=device)
+        atom_dis = torch.linalg.norm(pos[0][self.indices] - self.center_point,axis=1)
+        add_indices = torch.where(atom_dis > self.threshold)[0]
+             
+        if len(add_indices) > 0: 
+            # unit: self.spring eV/A**2; coordinate angstrom
+            for idx in add_indices:
+                magnitude = self.spring * (atom_dis[idx] - self.threshold)
+                assert(magnitude >= 0.)
+                direction = (self.center_point - pos[0][self.indices[idx]]) / torch.linalg.norm(self.center_point - pos[0][self.indices[idx]])
+                add_forces[self.indices[idx]] = direction * magnitude
+            add_forces *= 23.060543
+        
+        forces[0, :] = batch['forces'].detach() * 23.060543 + add_forces
+        return [batch['energy'].item()]
+
+class Monomerclass():
     def __init__(self, config, atom_types, parameters, r_max=None, device = "cuda:0"):
         # information such as masses, used by the integrator
         self.par = parameters
@@ -75,6 +120,14 @@ device = "cuda:0"
 mass = {'H':1.00794,'C':12.0107,'N':14.0067,'O':15.9994,'S':32.065}
 sym_dict = {'H':1,'C':6,'N':7,'O':8,'S':16}
 lmp_map = ["C","H","N","O","S"]; flag = False
+if os.path.isfile('conf.num'):
+    threshold = 6; spring = 1.04  
+    monomer_atoms_n = [] 
+    with open('conf.num','r') as fp:
+        for line in fp:
+            line = line.strip().split()
+            monomer_atoms_n.append(int(line[0]))    
+
 lmp_type = []
 
 mol_coords = []; mol_atypes = []; mol_masses = []
@@ -97,7 +150,33 @@ with open('conf.lmp','r') as fp:
 mol_atypes = np.array(mol_atypes,dtype=np.int64)
 mol_masses = np.array(mol_masses)
 mol_coords = np.array(mol_coords).reshape((mol_numAtoms,3,1))
+
 if int(do_md) == 1:
+    def init_infor(mol_masses,mol_coords,mol_atypes, monomer_atoms_n):
+        mol_coords = mol_coords.reshape((len(mol_coords),3))
+        mass_0 = mol_masses[0:monomer_atoms_n[0]]; mass_1 = mol_masses[monomer_atoms_n[0]:]
+        coord_0 = mol_coords[0:monomer_atoms_n[0]]; coord_1 = mol_coords[monomer_atoms_n[0]:]
+        mol_type_0 = mol_atypes[0:monomer_atoms_n[0]]; mol_type_1 = mol_atypes[monomer_atoms_n[0]:]
+
+        mass_cen_0 = np.sum(coord_0 * mass_0.reshape(-1,1),axis=0)/np.sum(mass_0)
+        mass_cen_1 = np.sum(coord_1 * mass_1.reshape(-1,1),axis=0)/np.sum(mass_1)
+        center_point = (mass_cen_0 + mass_cen_1)/2.
+        idx_0 = np.argsort(np.sum((coord_0 - mass_cen_0)**2,axis=1))
+        idx_1 = np.argsort(np.sum((coord_1 - mass_cen_1)**2,axis=1))
+        indices = []
+        for idx in idx_0:
+            if mol_type_0[idx] > 1:
+                indices.append(idx)
+                break
+        for idx in idx_1:
+            if mol_type_1[idx] > 1:
+                indices.append(idx + monomer_atoms_n[0])
+                break
+        return center_point, indices
+
+    if os.path.isfile('conf.num'):
+        center_point, indices = init_infor(mol_masses,mol_coords,mol_atypes, monomer_atoms_n)
+
     parameters = Parameters(mol_masses, mol_atypes, precision=precision, device=device)
 
     system = System(mol_numAtoms, nreplicas=1, precision=precision, device=device)
@@ -108,7 +187,11 @@ if int(do_md) == 1:
     config = configs.config_energy_force().model_config
     #config.n_dim = 32
     atom_types = torch.tensor((mol_atypes))
-    forces = Myclass(config, atom_types, parameters)
+    
+    if os.path.isfile('conf.num'):
+        forces = Dimerclass(config, atom_types, parameters, center_point, indices, spring, threshold)
+    else:
+        forces = Monomerclass(config, atom_types, parameters)
     state_dict = torch.load('../best.000.pt', map_location=device)
     model_state_dict = {}
     for key, value in state_dict.items():
@@ -116,7 +199,6 @@ if int(do_md) == 1:
             key = key[7:]
         model_state_dict[key] = value
     forces.model.load_state_dict(model_state_dict)
-
 
     langevin_gamma = 0.1
     timestep = 1
@@ -133,6 +215,7 @@ if int(do_md) == 1:
 
     iterator = tqdm(range(1, int(steps / output_period) + 1))
     Epot = forces.compute(system.pos, system.box, system.forces)
+
     try:
         for i in iterator:
             Ekin, Epot, T = integrator.step(niter=output_period)

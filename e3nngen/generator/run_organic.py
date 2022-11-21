@@ -536,6 +536,7 @@ def make_model_devi(iter_index,
     generalML = jdata.get('generalML',True)
     nequip_md = jdata.get('nequip_md',True)
     xtb_md = jdata.get('xtb_md',True)
+    dimer_md = jdata.get('dimer_md',True)
     if (iter_index >= len(model_devi_jobs)) :
         return False
     cur_job = model_devi_jobs[iter_index]
@@ -612,6 +613,8 @@ def make_model_devi(iter_index,
                 lmp_name = conf_name + '.lmp'
                 topo_name = conf_name + '.topo'
                 bondlength_name = conf_name + '.bondlength'
+                if dimer_md == True:
+                    topo_num_name = conf_name + '.toponum'
 
                 if shuffle_poscar :
                     os.symlink(cc, os.path.join(conf_path, orig_poscar_name))
@@ -621,7 +624,8 @@ def make_model_devi(iter_index,
                     os.symlink(cc, os.path.join(conf_path, poscar_name))
                     os.symlink(os.path.join(dir0,'topo.txt'),os.path.join(conf_path,topo_name))
                     os.symlink(os.path.abspath('./atompair_length.txt'),os.path.join(conf_path,bondlength_name))
-
+                    if dimer_md == True:
+                        os.symlink(os.path.abspath(dir0,'topo_num.txt'),os.path.join(conf_path,topo_num_name))
                 if 'sys_format' in jdata:
                     fmt = jdata['sys_format']
                 else:
@@ -663,6 +667,7 @@ def _make_model_devi_native(iter_index, jdata, mdata, conf_systems):
     generalML = jdata.get('generalML',True)
     nequip_md = jdata.get('nequip_md',True)
     xtb_md = jdata.get('xtb_md',True)
+    dimer_md = jdata.get('dimer_md',True)
     if (iter_index >= len(model_devi_jobs)) :
         return False
     cur_job = model_devi_jobs[iter_index]
@@ -737,7 +742,8 @@ def _make_model_devi_native(iter_index, jdata, mdata, conf_systems):
                     # symlink the topo file and the bondlength file
                     topo_name = make_model_devi_conf_name(sys_idx[sys_counter], conf_counter) + '.topo'
                     bondlength_name = make_model_devi_conf_name(sys_idx[sys_counter], conf_counter) + '.bondlength'
-
+                    if dimer_md == True:
+                        topo_num_name = make_model_devi_conf_name(sys_idx[sys_counter], conf_counter) + '.toponum'
                     task_path = os.path.join(work_path, task_name)
                     # dlog.info(task_path)
                     create_path(task_path)
@@ -749,6 +755,9 @@ def _make_model_devi_native(iter_index, jdata, mdata, conf_systems):
                                os.path.join(task_path, 'conf.topo') )
                     os.symlink(os.path.join(os.path.join('..','confs'), bondlength_name), 
                                os.path.join(task_path, 'conf.bondlength'))
+                    if dimer_md == True:
+                        os.symlink(os.path.join(os.path.join('..','confs'), topo_num_name),
+                               os.path.join(task_path, 'conf.num'))
                     cwd_ = os.getcwd()
                     if not os.path.isfile(os.path.join(task_path,'inference.py')):
                         os.symlink(os.path.join(cwd_,'inference.py'),os.path.join(task_path,'inference.py'))
@@ -812,6 +821,7 @@ def run_model_devi (iter_index,
     generalML = jdata.get('generalML',True)
     nequipMD = jdata.get('nequip_md',False)
     xtbmd = jdata.get('xtb_md',False)
+    dimermd = jdata.get('dimer_md', False)
     model_devi_exec = mdata['model_devi_command']
 
     model_devi_group_size = mdata['model_devi_group_size']
@@ -855,7 +865,10 @@ def run_model_devi (iter_index,
                 command = "python3 e3_layer_md.py %s %s %s %s %s 1" %(cur_job['temps'][-1],cur_job['nsteps']+cur_job['trj_freq'], cur_job['trj_freq'],jdata['bond_hi'],jdata['bond_lo']) 
                 command = "/bin/sh -c '%s'" % command
                 commands = [command]
-                forward_files = ['conf.lmp', 'e3_layer_md.py', 'topo.py', 'inference.py', 'conf.topo', 'conf.bondlength'] 
+                if dimermd == True:
+                    forward_files = ['conf.num', 'conf.lmp', 'e3_layer_md.py', 'topo.py', 'inference.py', 'conf.topo', 'conf.bondlength'] 
+                else:
+                    forward_files = ['conf.lmp', 'e3_layer_md.py', 'topo.py', 'inference.py', 'conf.topo', 'conf.bondlength'] 
                 backward_files = ['monitor.csv','model_devi.log','traj.hdf5','f_pred0.hdf5','f_pred1.hdf5','f_pred2.hdf5','f_pred3.hdf5','reasonable.txt','model_devi_online.out']
         elif xtbmd == True:
             # this function will be modify in the futurew
