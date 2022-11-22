@@ -625,7 +625,7 @@ def make_model_devi(iter_index,
                     os.symlink(os.path.join(dir0,'topo.txt'),os.path.join(conf_path,topo_name))
                     os.symlink(os.path.abspath('./atompair_length.txt'),os.path.join(conf_path,bondlength_name))
                     if dimer_md == True:
-                        os.symlink(os.path.abspath(dir0,'topo_num.txt'),os.path.join(conf_path,topo_num_name))
+                        os.symlink(os.path.join(dir0,'topo_num.txt'),os.path.join(conf_path,topo_num_name))
                 if 'sys_format' in jdata:
                     fmt = jdata['sys_format']
                 else:
@@ -2641,7 +2641,6 @@ def run_iter(param_file,machine_file):
                 post_model_devi (ii, jdata, mdata)
             ### dp fp part
             elif jj == 6 :
-            
                 log_iter ("make_fp", ii, jj)
                 make_fp (ii, jdata, mdata)
             elif jj == 7 :
@@ -2653,7 +2652,6 @@ def run_iter(param_file,machine_file):
             else :
                 raise RuntimeError ("unknown task %d, something wrong" % jj)
             record_iter (record, ii, jj)
-
 
 
 def gen_run(args):
