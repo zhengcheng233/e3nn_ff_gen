@@ -1042,10 +1042,10 @@ def post_model_devi (iter_index,
        
        command = "python3 topo.py %s %s %s %s" %(jdata["bond_hi"],jdata["bond_lo"],trj_freq, n_frames) 
        command += f"&& python3 -c \"import numpy as np; from e3_layers.data import Batch; import ase; atomic_n = ase.atom.atomic_numbers; coord = np.load('traj_deepmd/set.000/coord.npy'); coord = np.array(coord,dtype=np.single); type = np.loadtxt('traj_deepmd/type.raw'); type_map = {type_map}; species_n = [atomic_n[type_map[int(u)]] for u in type]; species_n = np.array(species_n,dtype=np.intc); e = np.array(0., dtype=np.single); lst = []; [lst.append(dict(pos=coord[ii].reshape((len(species_n),3)),energy=e, forces = coord[ii].reshape((len(species_n),3)), species=species_n)) for ii in range(len(coord))]; path = 'traj.hdf5'; attrs = {attrs}; batch = Batch.from_data_list(lst, attrs); batch.dumpHDF5(path)\""
-       command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5'}\" --model_path ../best.000.pt --output_keys forces --output_path f_pred0.hdf5" 
-       command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5'}\" --model_path ../best.001.pt --output_keys forces --output_path f_pred1.hdf5"
-       command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5'}\" --model_path ../best.002.pt --output_keys forces --output_path f_pred2.hdf5"
-       command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5'}\" --model_path ../best.003.pt --output_keys forces --output_path f_pred3.hdf5"
+       command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5','batch_size':48}\" --model_path ../best.000.pt --output_keys forces --output_path f_pred0.hdf5" 
+       command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5','batch_size':48}\" --model_path ../best.001.pt --output_keys forces --output_path f_pred1.hdf5"
+       command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5','batch_size':48}\" --model_path ../best.002.pt --output_keys forces --output_path f_pred2.hdf5"
+       command += "&& python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5','batch_size':48}\" --model_path ../best.003.pt --output_keys forces --output_path f_pred3.hdf5"
        
        commands = [command] 
        forward_files = ['traj']
