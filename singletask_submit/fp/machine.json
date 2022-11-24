@@ -1,0 +1,39 @@
+ {
+       "api_version": "1.0",
+       "train" :[
+         {
+           "command": "molpro -n 4 input.inp",
+           "machine": {
+             "batch_type": "DpCloudServer",
+             "context_type": "DpCloudServerContext",
+             "local_root" : "./",
+            "remote_profile":{
+              "email": "2369561300@qq.com",
+              "password": "_cz392781",
+              "program_id":2118,
+                "input_data":{
+                    "api_version":2,
+                    "job_type": "container",
+                    "grouped":true,
+                    "job_name": "molpro_test",
+                    "disk_size": 100,
+                    "scass_type":"c16_m64_cpu",
+                    "platform": "paratera",
+        "checkpoint_files":["00*/model.ckpt*","00*/checkpoint"],
+                   "checkpoint_time":15,
+                   "image_name":"registry.dp.tech/dptech/prod-1324/molproforposthf:v1",
+                    "on_demand":0
+                }
+            }
+          },
+          "resources": {
+            "number_node": 4113910,
+            "local_root":"./",
+            "cpu_per_node": 16,
+            "gpu_per_node": 1,
+            "queue_name": "CPU",
+            "group_size": 1,
+        "source_list": ["/root/molpro.sh"]
+          }
+        }]
+}
