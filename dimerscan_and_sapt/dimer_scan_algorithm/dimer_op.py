@@ -7,21 +7,40 @@ for later e3nn md explore
 
 import sys
 import numpy as np
-import MDAnalysis as mda
 import copy
 import os
 import ase
+from glob import glob
 
 atomic_masses = ase.data.atomic_masses
+atomic_numbers = ase.data.atomic_numbers
 
-def get_dimer(f_name):
-    data = np.load(f_name,allow_pickle=True)
-    coords = data['coords']; symbols = data['symbols']
-    monA_idx = data['monA_idx']; monB_idx = data['monB_idx']
-    bondA_idx = data['bondA_idx']; bondB_idx = data['bondB_idx']
-    ip_a = data['ip_a']; ip_b = data['ip_b']
-    homo_a = data['homo_a']; homo_b = data['homo_b']
-    return coords, symbols, monA_idx, monB_idx, bondA_idx, bondB_idx, ip_a, ip_b, homo_a, homo_b
+def get_dimer(type_map):
+    coords = np.transpose(np.load('traj.npy')[0],(1,0,2)); symbols = []
+    with open('conf.lmp','r') as fp:
+        for line in fp:
+            line = line.strip().split()
+            if len(line) == 5:
+                symbols.append(type_map[int(line[1])])
+    fr = open('conf.num','r'); lines = fr.readlines(); fr.close()
+    monA_idx = np.arange(int(lines[0].strip().split()[0]))
+    monB_idx = np.arange(int(lines[1].strip().split()[0]))
+    data = []
+    #with open('minimal_data.txt','r') as fp: 
+    #    for line in fp:
+    #        line = line.strip().split()
+    #        data.append(float(line[0]))
+    #if len(data) == 2:
+    #    ip_a = data[0]; homo_a = data[1]; ip_b = data[0]; homo_b = data[1]
+    #else:
+    #    ip_a = data[0]; homo_a = data[1]; ip_b = data[2]; homo_b = data[3]
+    ip_a = 0.; ip_b = 0.; homo_a = 0.; homo_b = 0.
+    reasons = np.loadtxt('reasonable.txt')
+    _coords = []
+    for idx,cc in enumerate(coords):
+        if reasons[idx][0] > 0.5:
+            _coords.append(cc)
+    return _coords, symbols, monA_idx, monB_idx, ip_a, ip_b, homo_a, homo_b
 
 def gen_molpro_output(coord, symbol, monA_idx, monB_idx, template_fn, ac_data, ofn=None, label=None):
     if ofn is None:
@@ -106,9 +125,9 @@ def find_closest_distance(coord_A, coord_B):
     min_i = -1; min_j = -1
     min_dr = 10000
     for i in range(n_atoms1):
-        r1 = pos1[i]
+        r1 = coord_A[i]
         for j in range(n_atoms2):
-            r2 = pos2[j] 
+            r2 = coord_B[j] 
             if np.linalg.norm(r1-r2) < min_dr:
                 min_dr = np.linalg.norm(r1-r2)
                 min_i = i
@@ -116,18 +135,18 @@ def find_closest_distance(coord_A, coord_B):
     return min_i, min_j, min_dr
 
 def mass_center(coord,symbol):
-    mol_mass = [atomic_masses[u] for u in symbol]
+    mol_mass = [atomic_masses[atomic_numbers[u]] for u in symbol]
     mol_mass = np.array(mol_mass).reshape(-1,1)
     return np.sum(coord * mol_mass, axis=0)/np.sum(mol_mass)
    
 
-def gen_scan(coord, symbol, monA_idx, monB_idx, bondA_idx, bondB_idx):
-    coord_A = [coord[uu] for uu in monA_idx]; coord_B = [coord[uu] for uu in monB_idx]
-    symbol_A = [symbol[uu] for uu in monA_idx]; symbol_B = [symbol[uu] for uu in monB_idx]
+def gen_scan(coord, symbol, monA_idx, monB_idx):
+    coord_A = [coord[uu] for uu in monA_idx]; coord_B = [coord[uu+len(monA_idx)] for uu in monB_idx]
+    symbol_A = [symbol[uu] for uu in monA_idx]; symbol_B = [symbol[uu+len(monA_idx)] for uu in monB_idx]
     dr = 1; r_min = 1.4; r_max = 6.2
     n_atoms1 = len(monA_idx); n_atoms2 = len(monB_idx)
     i, j, min_dr = find_closest_distance(coord_A, coord_B) 
-    dr_com = mass_center(coord_B, symbol_A) - mass_center(coord_A,symbol_A)
+    dr_com = mass_center(coord_B, symbol_B) - mass_center(coord_A,symbol_A)
     dn_com = dr_com / np.linalg.norm(dr_com)
     pos0 = copy.deepcopy(coord_B)
     i = 0; di = 0.1
@@ -150,14 +169,15 @@ def gen_scan(coord, symbol, monA_idx, monB_idx, bondA_idx, bondB_idx):
     i_max = i - di
     i_switch1 = i_min + (i_max - i_min)/6 
     i_switch2 = i_min + (i_max - i_min)*3/6
-    indices = list(np.arange(i_min, i_swithc1, (i_switch1-i_min)/4)) \
-            + list(np.arange(i_switch1, i_switch2, (i_swith2 - i_switch1)/4)) \
+    indices = list(np.arange(i_min, i_switch1, (i_switch1-i_min)/4)) \
+            + list(np.arange(i_switch1, i_switch2, (i_switch2 - i_switch1)/4)) \
             + list(np.arange(i_switch2, i_max, (i_max-i_switch2)/3))
-    positons = []
+    # !!!!!! have problem
+    positions = []
     for i in indices:
-        pos = copy.deepcopy(pos0)
-        pos += dn_com * dr * i
-        coord[-len(pos):] = pos
+        coord = np.zeros((len(monA_idx) + len(monB_idx),3))
+        coord[0:len(monA_idx)] = coord_A
+        coord[len(monA_idx):] = coord_B + dn_com * dr * i
         positions.append(coord)
     return indices, positions
     
@@ -168,8 +188,6 @@ def gen_gjf(pos, symbol,ofn=None):
         ofile = open(ofn, 'w')
     print("# HF/6-31G(d)\n\ntitle\n\n0 1", file=ofile)
     for elem,r in zip(symbol,pos):
-        elem = atom.type
-        r = atom.position
         print('%3s%15.8f%15.8f%15.8f'%(elem, r[0], r[1], r[2]), file=ofile)
     print('', file=ofile)
     return
@@ -184,37 +202,56 @@ def clean_folder(i_frame, maindir):
     folder = maindir + '/' + padding(i_frame)
     if os.path.isdir(folder):
         os.system('rm -r %s'%folder)
-    os.system('mkdir %s'%folder)
+    os.system('mkdir -p %s'%folder)
     return folder
 
-if __name__ == '__main__':
+def dimer_scan(n_sample,type_map):
     # pick a frame and scan
     # i_frame = np.random.randint(1000) #int(sys.argv[1])
-    f_name = sys.argv[1]; i_frame = int(sys.argv[2])
-    coords, symbols, monA_idx, monB_idx, bondA_idx, bondB_idx, ip_a, ip_b, homo_a, homo_b = get_dimer(f_name)
+    #i_frame = int(sys.argv[2])
+    coords, symbols, monA_idx, monB_idx, ip_a, ip_b, homo_a, homo_b = get_dimer(type_map)
     # scan the dimer geometry provided according to i_frame
-    coord = coords[i_frame]; symbol = symbols[i_frame]
-    indices, positions = gen_scan(coord,symbol,monA_idx,monB_idx,bondA_idx,bondB_idx) 
+    def confor_gen(i_frame, coords, symbols, monA_idx, monB_idx, ip_a, ip_b, homo_a, homo_b):
+        coord = coords[i_frame]; symbol = symbols
+        indices, positions = gen_scan(coord, symbol, monA_idx, monB_idx) 
+        n_data = len(indices)
+        folder_gjf = clean_folder(i_frame, 'gjfs')
+        folder_sapt = clean_folder(i_frame, 'sapt')
+        folder_mp2 = clean_folder(i_frame, 'mp2')
+        #folder_pdb = clean_folder(i_frame, 'pdb')
+        for i_data in range(n_data):
+            pos = positions[i_data]
+            # generate gjf files for visualization
+            ofn = folder_gjf + '/' + padding(i_data) + '.gjf'
+            gen_gjf(pos, symbol, ofn)
 
-    n_data = len(indices)
-    folder_gjf = clean_folder(i_frame, 'gjfs')
-    folder_sapt = clean_folder(i_frame, 'sapt')
-    folder_mp2 = clean_folder(i_frame, 'mp2')
-    folder_pdb = clean_folder(i_frame, 'pdb')
-    for i_data in range(n_data):
-        pos = positions[i_data]
-        # generate gjf files for visualization
-        ofn = folder_gjf + '/' + padding(i_data) + '.gjf'
-        gen_gjf(pos, symbol, ofn)
+            # write pdb
+            #ofn = folder_pdb + '/' + padding(i_data) + '.pdb'
+            #u.atoms.write(ofn)
 
-        # write pdb
-        #ofn = folder_pdb + '/' + padding(i_data) + '.pdb'
-        #u.atoms.write(ofn)
+            # generate sapt file
+            ofn = folder_sapt + '/' + padding(i_data) + '.com'
+            gen_molpro_output(pos, symbol, monA_idx, monB_idx, 'sapt_template.com', np.array([[ip_a,homo_a],[ip_b,homo_b]]), ofn=ofn, label='shift= %.6f'%indices[i_data])
 
-        # generate sapt file
-        ofn = folder_sapt + '/' + padding(i_data) + '.com'
-        gen_molpro_output(pos, symbol, monA_idx, monB_idx, 'sapt_template.com', np.array([[ip_a,homo_a],[ip_b,homo_b]]), ofn=ofn, label='shift= %.6f'%indices[i_data])
+            # # generate mp2 file
+            ofn = folder_mp2 + '/' + padding(i_data) + '.com'
+            gen_molpro_output(pos, symbol, monA_idx, monB_idx, 'mp2_template.com', np.array([[ip_a,homo_a],[ip_b,homo_b]]), ofn=ofn, label='shift = %.6f'%indices[i_data])
+        return
+    n_interval = int(len(coords) / n_sample)
+    for ii in range(0,len(coords),n_interval):
+        confor_gen(ii, coords, symbols, monA_idx, monB_idx, ip_a, ip_b, homo_a, homo_b)
+    return 
 
-        # # generate mp2 file
-        ofn = folder_mp2 + '/' + padding(i_data) + '.com'
-        gen_molpro_output(pos, symbol, monA_idx, monB_idx, 'mp2_template.com', np.array([[ip_a,homo_a],[ip_b,homo_b]]), ofn=ofn, label='shift = %.6f'%indices[i_data])
+if __name__ == '__main__':
+    md_traj_files = glob('./task.*')[35:]; n_sample = int(sys.argv[1])
+    cwd_ = os.getcwd(); type_map = ['X','C','H','N','O','S']
+    for dir0 in md_traj_files:
+        print('********')
+        print(dir0)
+        os.chdir(dir0)
+        if os.path.isfile('sapt_template.com') is not True:
+            os.symlink(os.path.join(cwd_,'sapt_template.com'),'sapt_template.com')
+        if os.path.isfile('mp2_template.com') is not True:
+            os.symlink(os.path.join(cwd_,'mp2_template.com'),'mp2_template.com')
+        dimer_scan(n_sample,type_map)
+        os.chdir(cwd_)
