@@ -58,6 +58,12 @@ def gen_molpro_output(coord, symbol, monA_idx, monB_idx, template_fn, ac_data, q
     with open(template_fn) as ifile:
         iread = 0
         for line in ifile:
+            if 'charge=0' in line and 'charge A' in line:
+                print('set,charge=%s'%q_A, file=ofile)
+                continue
+            if 'charge=0' in line and 'charge B' in line:
+                print('set,charge=%s'%q_B, file=ofile)
+                continue
             if iread == 0 and 'geometry=' in line:
                 iread = 1
                 print(line, end='', file=ofile)
@@ -117,14 +123,18 @@ def gen_molpro_output(coord, symbol, monA_idx, monB_idx, template_fn, ac_data, q
             elif 'eps_homo_pbe0_B=' in line:
                 print('eps_homo_PBE0_B=%.6f'%ac_data[1, 1], file=ofile)
                 continue
-            elif 'df-hf' in line and 'ca' in line:
-                print('{df-hf,basis=jkfit,locorb=0; wf, charge=%s, spin=0; save,$ca}'%q_A, file=ofile)
-            elif 'df-hf' in line and 'cb' in line:
-                print('{df-hf,basis=jkdit,locord=0; wf, charge=%s, spin=0; save,$cb}'%q_B, file=ofile)
-            elif 'charge=' in line and 'monomer A' in line:
-                print('set,charge=%s'%q_A, file=ofile)
-            elif 'charge=' in line and 'monomer B' in line:
-                print('set,charge=%s'%q_B, file=ofile)
+            if 'df-hf' in line:
+                if 'ca' in line:
+                    print('{df-hf,basis=jkfit,locorb=0; wf, charge=%s, spin=0; save,$ca}'%q_A, file=ofile)
+                    continue
+                elif 'cb' in line:
+                    print('{df-hf,basis=jkdit,locord=0; wf, charge=%s, spin=0; save,$cb}'%q_B, file=ofile)
+                    continue
+                else:
+                    q_tot = q_A + q_B
+                    print('{df-hf,basis=jkfit,locorb=0; wf, charge=%s, spin=0}'%q_tot, file=ofile)
+                    continue
+
             print(line, end='', file=ofile)
     ofile.close()
     return
