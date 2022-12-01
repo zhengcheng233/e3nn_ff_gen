@@ -26,23 +26,25 @@ def get_dimer(type_map):
     monA_idx = np.arange(int(lines[0].strip().split()[0]))
     monB_idx = np.arange(int(lines[1].strip().split()[0]))
     data = []
-    #with open('minimal_data.txt','r') as fp: 
-    #    for line in fp:
-    #        line = line.strip().split()
-    #        data.append(float(line[0]))
-    #if len(data) == 2:
-    #    ip_a = data[0]; homo_a = data[1]; ip_b = data[0]; homo_b = data[1]
-    #else:
-    #    ip_a = data[0]; homo_a = data[1]; ip_b = data[2]; homo_b = data[3]
-    ip_a = 0.; ip_b = 0.; homo_a = 0.; homo_b = 0.
+    with open('minimal_data.txt','r') as fp: 
+        for line in fp:
+            line = line.strip().split()
+            data.append(float(line[0]))
+    if len(data) == 2:
+        ip_a = data[0]; homo_a = data[1]; ip_b = data[0]; homo_b = data[1]
+    else:
+        ip_a = data[0]; homo_a = data[1]; ip_b = data[2]; homo_b = data[3]
     reasons = np.loadtxt('reasonable.txt')
     _coords = []
     for idx,cc in enumerate(coords):
         if reasons[idx][0] > 0.5:
             _coords.append(cc)
-    return _coords, symbols, monA_idx, monB_idx, ip_a, ip_b, homo_a, homo_b
+    # for A-B type dimer; we need to change later
+    q_net = np.loadtxt('q_net.txt',dtype=int)
+    q_A = q_net//2; q_B = q_net//2
+    return _coords, symbols, monA_idx, monB_idx, ip_a, ip_b, homo_a, homo_b, q_A, q_B
 
-def gen_molpro_output(coord, symbol, monA_idx, monB_idx, template_fn, ac_data, ofn=None, label=None):
+def gen_molpro_output(coord, symbol, monA_idx, monB_idx, template_fn, ac_data, q_A, q_B, ofn=None, label=None):
     if ofn is None:
         ofile = sys.stdout
     else:
@@ -115,6 +117,14 @@ def gen_molpro_output(coord, symbol, monA_idx, monB_idx, template_fn, ac_data, o
             elif 'eps_homo_pbe0_B=' in line:
                 print('eps_homo_PBE0_B=%.6f'%ac_data[1, 1], file=ofile)
                 continue
+            elif 'df-hf' in line and 'ca' in line:
+                print('{df-hf,basis=jkfit,locorb=0; wf, charge=%s, spin=0; save,$ca}'%q_A, file=ofile)
+            elif 'df-hf' in line and 'cb' in line:
+                print('{df-hf,basis=jkdit,locord=0; wf, charge=%s, spin=0; save,$cb}'%q_B, file=ofile)
+            elif 'charge=' in line and 'monomer A' in line:
+                print('set,charge=%s'%q_A, file=ofile)
+            elif 'charge=' in line and 'monomer B' in line:
+                print('set,charge=%s'%q_B, file=ofile)
             print(line, end='', file=ofile)
     ofile.close()
     return
@@ -209,7 +219,7 @@ def dimer_scan(n_sample,type_map):
     # pick a frame and scan
     # i_frame = np.random.randint(1000) #int(sys.argv[1])
     #i_frame = int(sys.argv[2])
-    coords, symbols, monA_idx, monB_idx, ip_a, ip_b, homo_a, homo_b = get_dimer(type_map)
+    coords, symbols, monA_idx, monB_idx, ip_a, ip_b, homo_a, homo_b, q_A, q_B = get_dimer(type_map)
     # scan the dimer geometry provided according to i_frame
     def confor_gen(i_frame, coords, symbols, monA_idx, monB_idx, ip_a, ip_b, homo_a, homo_b):
         coord = coords[i_frame]; symbol = symbols
@@ -231,11 +241,11 @@ def dimer_scan(n_sample,type_map):
 
             # generate sapt file
             ofn = folder_sapt + '/' + padding(i_data) + '.com'
-            gen_molpro_output(pos, symbol, monA_idx, monB_idx, 'sapt_template.com', np.array([[ip_a,homo_a],[ip_b,homo_b]]), ofn=ofn, label='shift= %.6f'%indices[i_data])
+            gen_molpro_output(pos, symbol, monA_idx, monB_idx, 'sapt_template.com', np.array([[ip_a,homo_a],[ip_b,homo_b]]), q_A, q_B, ofn=ofn, label='shift= %.6f'%indices[i_data])
 
             # # generate mp2 file
             ofn = folder_mp2 + '/' + padding(i_data) + '.com'
-            gen_molpro_output(pos, symbol, monA_idx, monB_idx, 'mp2_template.com', np.array([[ip_a,homo_a],[ip_b,homo_b]]), ofn=ofn, label='shift = %.6f'%indices[i_data])
+            gen_molpro_output(pos, symbol, monA_idx, monB_idx, 'mp2_template.com', np.array([[ip_a,homo_a],[ip_b,homo_b]]), q_A, q_B, ofn=ofn, label='shift = %.6f'%indices[i_data])
         return
     n_interval = int(len(coords) / n_sample)
     for ii in range(0,len(coords),n_interval):
@@ -243,11 +253,10 @@ def dimer_scan(n_sample,type_map):
     return 
 
 if __name__ == '__main__':
-    md_traj_files = glob('./task.*')[35:]; n_sample = int(sys.argv[1])
+    md_traj_files = glob('./task.*')[0:3]; n_sample = int(sys.argv[1])
+    print(md_traj_files)
     cwd_ = os.getcwd(); type_map = ['X','C','H','N','O','S']
     for dir0 in md_traj_files:
-        print('********')
-        print(dir0)
         os.chdir(dir0)
         if os.path.isfile('sapt_template.com') is not True:
             os.symlink(os.path.join(cwd_,'sapt_template.com'),'sapt_template.com')
