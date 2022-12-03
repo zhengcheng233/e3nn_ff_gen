@@ -199,6 +199,7 @@ def gen_scan(coord, symbol, monA_idx, monB_idx):
         coord[0:len(monA_idx)] = coord_A
         coord[len(monA_idx):] = coord_B + dn_com * dr * i
         positions.append(coord)
+    indices = indices; positions = positions
     return indices, positions
     
 def gen_gjf(pos, symbol,ofn=None):
@@ -257,17 +258,22 @@ def dimer_scan(n_sample,type_map):
             ofn = folder_mp2 + '/' + padding(i_data) + '.com'
             gen_molpro_output(pos, symbol, monA_idx, monB_idx, 'mp2_template.com', np.array([[ip_a,homo_a],[ip_b,homo_b]]), q_A, q_B, ofn=ofn, label='shift = %.6f'%indices[i_data])
         return
-    n_interval = int(len(coords) / n_sample)
+    n_interval = int(len(coords) / n_sample); num = 0
     for ii in range(0,len(coords),n_interval):
-        confor_gen(ii, coords, symbols, monA_idx, monB_idx, ip_a, ip_b, homo_a, homo_b)
+        if num < n_sample:
+            confor_gen(ii, coords, symbols, monA_idx, monB_idx, ip_a, ip_b, homo_a, homo_b)
+        num += 1
     return 
 
 if __name__ == '__main__':
-    md_traj_files = glob('./task.*')[0:3]; n_sample = int(sys.argv[1])
-    print(md_traj_files)
+    md_traj_files = glob('./task.*'); n_sample = int(sys.argv[1])
     cwd_ = os.getcwd(); type_map = ['X','C','H','N','O','S']
+    #print(md_traj_files[0:3])
     for dir0 in md_traj_files:
         os.chdir(dir0)
+        #os.system('rm -rf gjfs')
+        #os.system('rm -rf mp2')
+        #os.system('rm -rf sapt')
         if os.path.isfile('sapt_template.com') is not True:
             os.symlink(os.path.join(cwd_,'sapt_template.com'),'sapt_template.com')
         if os.path.isfile('mp2_template.com') is not True:
