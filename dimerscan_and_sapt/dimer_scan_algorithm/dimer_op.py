@@ -128,7 +128,7 @@ def gen_molpro_output(coord, symbol, monA_idx, monB_idx, template_fn, ac_data, q
                     print('{df-hf,basis=jkfit,locorb=0; wf, charge=%s, spin=0; save,$ca}'%q_A, file=ofile)
                     continue
                 elif 'cb' in line:
-                    print('{df-hf,basis=jkdit,locord=0; wf, charge=%s, spin=0; save,$cb}'%q_B, file=ofile)
+                    print('{df-hf,basis=jkfit,locorb=0; wf, charge=%s, spin=0; save,$cb}'%q_B, file=ofile)
                     continue
                 else:
                     q_tot = q_A + q_B
@@ -270,6 +270,7 @@ if __name__ == '__main__':
     cwd_ = os.getcwd(); type_map = ['X','C','H','N','O','S']
     #print(md_traj_files[0:3])
     for dir0 in md_traj_files:
+        print(dir0)
         os.chdir(dir0)
         #os.system('rm -rf gjfs')
         #os.system('rm -rf mp2')
