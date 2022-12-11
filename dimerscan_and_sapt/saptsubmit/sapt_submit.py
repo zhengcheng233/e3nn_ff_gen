@@ -26,8 +26,8 @@ def run_e3nn(mdata):
     train_resources = mdata['train_resources']
     train_machine = mdata['train_machine']
     make_failure = train_resources.get('mark_failure', False)
-    work_path = os.path.join("./dimer_md_for_sapt")
-    all_tasks = glob(os.path.join(work_path,'near.*'))[0:4]
+    work_path ='./dimer_md_for_sapt'
+    all_tasks = glob(os.path.join(work_path,'far.*'))[4:6]
     all_tasks.sort()
     run_tasks = [os.path.basename(ii) for ii in all_tasks]
     commands.append(train_command)
