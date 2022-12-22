@@ -283,10 +283,10 @@ else:
     os.system('cp traj_old.hdf5 traj.hdf5')
     os.system('cp reasonable_old.txt reasonable.txt')
 
-os.system("python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5'}\" --model_path ../best.000.pt --output_keys forces --output_path f_pred0.hdf5")
-os.system("python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5'}\" --model_path ../best.001.pt --output_keys forces --output_path f_pred1.hdf5")
-os.system("python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5'}\" --model_path ../best.002.pt --output_keys forces --output_path f_pred2.hdf5")
-os.system("python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5'}\" --model_path ../best.003.pt --output_keys forces --output_path f_pred3.hdf5")
+os.system("python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5','batch_size':32}\" --model_path ../best.000.pt --output_keys forces --output_path f_pred0.hdf5")
+os.system("python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5','batch_size':32}\" --model_path ../best.001.pt --output_keys forces --output_path f_pred1.hdf5")
+os.system("python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5','batch_size':32}\" --model_path ../best.002.pt --output_keys forces --output_path f_pred2.hdf5")
+os.system("python3 inference.py --config config_energy_force --config_spec \"{'data_config.path':'traj.hdf5','batch_size':32}\" --model_path ../best.003.pt --output_keys forces --output_path f_pred3.hdf5")
 
 def write_model_devi_out(devi: np.ndarray, fname: str):
     assert devi.shape[1] == 7
