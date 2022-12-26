@@ -2362,6 +2362,18 @@ def model_devi_vs_err_adjust_loose(jdata):
     else:
         new_simul = False
         do_md = 0
+
+    ###################################################################################
+    # !!!!! to avoid model_devi raise cause thre no candidate can be select 
+    fp_tasks = glob.glob('./task.*')
+    if len(fp_tasks) == 0 and new_simul == False:
+        new_simul = True; do_md = 1
+        if md_num < 2:
+            for idx in sys_idx_new:
+                jdata['model_devi_f_trust_lo'][idx] = jdata['model_devi_f_trust_lo'][idx] * 0.95
+                jdata['model_devi_f_trust_hi'][idx] = jdata['model_devi_f_trust_hi'][idx] * 1.05
+    
+    ###################################################################################
     
     if new_simul == True:
         sys_idx_new = all_sys_idx_loose_new
@@ -2507,6 +2519,13 @@ def model_devi_vs_err_adjust(jdata):
 
     if len(sys_idx_new) == 0:
         new_simul = True
+
+    ######################################################################################
+    # !!!!! to avoid model_devi raise and cause the no candidate can be select 
+    #fp_tasks = glob.glob('./task.*')
+    #if len(fp_tasks) == 0 and new_simul == False:
+    #    new_simul = True
+    ######################################################################################
 
     if new_simul == True:
         idx_temps = len(np.where(np.array(T_list)<temps)[0])
