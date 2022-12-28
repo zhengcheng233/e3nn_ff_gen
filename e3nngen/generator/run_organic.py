@@ -2426,7 +2426,11 @@ def model_devi_vs_err_adjust_loose(jdata):
             pass
         else:
             new_simul_T = False
+
     if md_num > e3nn_md_cut * 2 and do_md > 0.5:
+        new_simul_T = True
+
+    if len(sys_idx_new) == 0 and len(all_sys_idx_loose_new) == 0:
         new_simul_T = True
 
     if new_simul_T == True:
@@ -2443,14 +2447,20 @@ def model_devi_vs_err_adjust_loose(jdata):
             md_num = 0
 
     jdata['md_num'] = md_num
-    
     if _idx == len(jdata['model_devi_jobs']):
         # new simulational condition
         md_cond = {'_idx':data_system_fmt%_idx, "sys_idx":all_sys_idx, "temps":[temps], "press": [1], "nsteps": next_nsteps, "trj_freq": trj_freq, "ensemble":ensemble}
         jdata['model_devi_jobs'].append(md_cond)
     else:
         # old simulational condition but not converged
-        jdata['model_devi_jobs'].append({'_idx':data_system_fmt%(_idx+1), "sys_idx":sys_idx_new,"temps":j_last_devi["temps"], "press":[1], "nsteps":j_last_devi["nsteps"], "trj_freq":j_last_devi["trj_freq"],"ensemble":j_last_devi["ensemble"]})
+        if len(sys_idx_new) == 0:
+            if len(jdata['all_sys_idx_loose']) == 0:
+                print('unnormal situation; need check') 
+                jdata['model_devi_jobs'].append({'_idx':data_system_fmt%(_idx+1), "sys_idx":[],"temps":j_last_devi["temps"], "press":[1], "nsteps":j_last_devi["nsteps"], "trj_freq":j_last_devi["trj_freq"],"ensemble":j_last_devi["ensemble"]})
+            else:
+                jdata['model_devi_jobs'].append({'_idx':data_system_fmt%(_idx+1), "sys_idx":all_sys_idx_loose_new,"temps":j_last_devi["temps"], "press":[1], "nsteps":j_last_devi["nsteps"], "trj_freq":j_last_devi["trj_freq"],"ensemble":j_last_devi["ensemble"]})
+        else:
+            jdata['model_devi_jobs'].append({'_idx':data_system_fmt%(_idx+1), "sys_idx":sys_idx_new,"temps":j_last_devi["temps"], "press":[1], "nsteps":j_last_devi["nsteps"], "trj_freq":j_last_devi["trj_freq"],"ensemble":j_last_devi["ensemble"]})
     
     os.chdir(cwd)
     return jdata
