@@ -121,7 +121,7 @@ mass = {'H':1.00794,'C':12.0107,'N':14.0067,'O':15.9994,'S':32.065}
 sym_dict = {'H':1,'C':6,'N':7,'O':8,'S':16}
 lmp_map = ["C","H","N","O","S"]; flag = False
 if os.path.isfile('conf.num'):
-    threshold = 5.5; spring = 1.04  
+    threshold = 6.; spring = 1.04  
     monomer_atoms_n = [] 
     with open('conf.num','r') as fp:
         for line in fp:
