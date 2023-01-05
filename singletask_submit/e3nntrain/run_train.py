@@ -64,8 +64,8 @@ _gaussian_check_fin = run._gaussian_check_fin; _check_skip_train = run._check_sk
 _check_empty_iter = run._check_empty_iter; detect_batch_size = run.detect_batch_size
 
 ii = int(sys.argv[1]); epoch_sub = int(sys.argv[2])
-work_path = './train'
-task_path = os.path.join('train',train_task_fmt % ii)
+work_path = './'
+task_path = os.path.join(train_task_fmt % ii)
 all_tasks = []
 all_tasks.append(task_path)
 n_train = 0 
@@ -82,22 +82,23 @@ init_data_sys = []
 trains_comm_data = []
 cwd = os.getcwd()
 os.chdir(work_path)
-fp_data = glob.glob(os.path.join('data.all/data.iters','iter.*','02.fp','data.*'))
+fp_data = glob.glob(os.path.join('data.all/data*','iter.*','02.fp','data.*'))
 #for ii in init_data_sys :
 #    trains_comm_data += glob.glob(os.path.join(ii, 'fp.hdf5'))
 #    n_train += h5py.File(os.path.join(ii, 'fp.hdf5'),'r')['_n_nodes'].shape[0]
 for ii in fp_data:
-    trains_comm_data += glob.glob(os.path.join(ii, 'fp.hdf5'))
-    #n_train += h5py.File(os.path.join(ii, 'fp.hdf5'),'r')['_n_nodes'].shape[0]
+    if os.path.isfile(os.path.join(ii, 'fp.hdf5')):
+        trains_comm_data += glob.glob(os.path.join(ii, 'fp.hdf5'))
+        n_train += h5py.File(os.path.join(ii, 'fp.hdf5'),'r')['_n_nodes'].shape[0]
 os.chdir(cwd)
 #n_train = int(n_train)
 
-n_train = int(sys.argv[3])
+#n_train = int(sys.argv[3])
 
 training_init_model = False; train_command = "config_energy_force"
 commands = []
 if training_init_model:
-    command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':64,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s}\" --resume_from results/default/trainer.pt" %(train_command, n_train-64, max(int(n_train/10000),1),epoch_sub)
+    command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':64,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s}\" --resume_from results/default_project/default/trainer.pt" %(train_command, n_train-64, max(int(n_train/10000),1),epoch_sub)
 else:
     command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':64,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s}\"" %(train_command, n_train-64, max(int(n_train/10000),1),epoch_sub)
 commands.append(command)
@@ -105,9 +106,9 @@ commands.append(command)
 run_tasks = [os.path.basename(ii) for ii in all_tasks]
 forward_files = ['train.py']
 if training_init_model:
-    forward_files += [os.path.join('results', 'default', 'trainer.pt')]
-    forward_files += [os.path.join('results', 'default', 'last.pt')]
-    forward_files += [os.path.join('results', 'default', 'best.pt')]
+    forward_files += [os.path.join('old','results', 'default_project', 'default', 'trainer.pt')]
+    forward_files += [os.path.join('old','results', 'default_project', 'default', 'last.pt')]
+    forward_files += [os.path.join('old','results', 'default_project', 'default', 'best.pt')]
 backward_files = ['results']
 
 train_group_size = 1

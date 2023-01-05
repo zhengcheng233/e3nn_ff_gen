@@ -13,23 +13,22 @@
             "program_id":2118,
               "input_data":{
                   "api_version":2,
-                  "job_type": "indicate",
+                  "job_type": "container",
                   "grouped":true,
-                  "job_name": "alloy_train",
+                  "job_name": "organic_train",
                   "disk_size": 100,
-                  "instance_group_id": 4,
                   "scass_type":"c8_m32_1 * NVIDIA V100",
                   "platform": "ali",
 	  "checkpoint_files":["00*/model.ckpt*","00*/checkpoint"],
                   "checkpoint_time":15,
-                  "image_name":"LBG_nequip_test_1",
-		  "region":"cn-zhangjiakou",
+                  "image_name":"registry.dp.tech/dptech/prod-1324/e3nn-with-torchmdgpu:v2",
+                  "region":"cn-zhangjiakou",
                   "on_demand":0
               }
           }
         },
         "resources": {
-          "number_node": 7173344,
+          "number_node": 4201092,
           "local_root":"./",
           "cpu_per_node": 4,
           "gpu_per_node": 1,
@@ -51,28 +50,28 @@
             "program_id":2118,
               "input_data":{
                 "api_version":2,
-                "job_type": "indicate",
+                "job_type": "container",
 		"log_file": "*/model_devi.log",
                 "grouped":true,
-                "job_name": "alloy_model_devi",
+                "job_name": "organic_model_devi",
                 "checkpoint_files":"sync_files",
                 "checkpoint_time":15,
                 "disk_size": 100,
-                 "instance_group_id": 4,
-                 "scass_type":"c8_m32_1 * NVIDIA V100",
+                 "scass_type":"c8_m31_1 * NVIDIA T4",
                 "platform": "ali",
-                "image_name":"LBG_DP2.0.1_attn0.2_",
+                "image_name":"registry.dp.tech/dptech/prod-1324/e3nn-with-torchmdgpu:v2",
                 "on_demand":0
               }
           }
         },
         "resources": {
-          "number_node": 6381233,
+          "number_node": 1493621,
           "local_root":"./",
           "cpu_per_node": 4,
           "gpu_per_node": 1,
-          "queue_name": "GPU",
-          "group_size": 50
+          "queue_name": "CPU",
+          "group_size": 1,
+	  "source_list": ["/root/e3_layer.sh"]
         }
       }],
     "fp":
@@ -88,28 +87,28 @@
             "program_id":2118,
               "input_data":{
                 "api_version":2,
-                "job_type": "indicate",
+                "job_type": "container",
                 "log_file": "task*/fp.log",
                 "grouped":true,
-                "job_name": "organic_mol",
+                "job_name": "organic_fp",
                 "checkpoint_files":"sync_files",
                 "checkpoint_time":15,
                 "disk_size": 100,
-                "scass_type":"c8_m32_cpu",
+                "scass_type":"c16_m32_cpu",
                 "platform": "ali",
-                "image_name":"LBG_Gaussian_1_v2",
+                "image_name":"registry.dp.tech/dptech/gaussian:16-avx2",
                 "on_demand":0
               }
           }
         },
         "resources": {
-          "number_node": 9570139,
+          "number_node": 4039731,
           "cpu_per_node": 8,
           "gpu_per_node": 0,
           "queue_name": "CPU",
-          "group_size": 20,
+          "group_size": 5,
           "local_root":"./",
-      "source_list": ["/root/g16.sh"]
+    "source_list": ["/root/g16_sse.sh"]
         }
       }
     ]
