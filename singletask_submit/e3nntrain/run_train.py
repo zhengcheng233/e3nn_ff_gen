@@ -95,10 +95,10 @@ os.chdir(cwd)
 
 #n_train = int(sys.argv[3])
 
-training_init_model = False; train_command = "config_energy_force"
+training_init_model = True; train_command = "config_energy_force"
 commands = []
 if training_init_model:
-    command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':64,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s}\" --resume_from results/default_project/default/trainer.pt" %(train_command, n_train-64, max(int(n_train/10000),1),epoch_sub)
+    command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':64,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s}\" --resume_from old/results/default_project/default/trainer.pt" %(train_command, n_train-64, max(int(n_train/10000),1),epoch_sub)
 else:
     command = "python3 train.py --config %s --config_spec \"{'data_config.n_train':%s,'data_config.n_val':64,'data_config.path':'../data.all/:.+fp.hdf5','batch_size':64,'stride':%s, 'epoch_subdivision':%s}\"" %(train_command, n_train-64, max(int(n_train/10000),1),epoch_sub)
 commands.append(command)
