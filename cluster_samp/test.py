@@ -131,17 +131,7 @@ def frag_gen(ligs, cov_idx, symbol, n_heavy=8):
 def cluster_gen(frgs, cov_idx, bond_type, symbol):
     """ 
     add hydrogen atoms or heavy atoms for bond saturation 
-    a system should only include closed atoms and open atoms only conneted with outsied atoms with single bond 
-    step 1: get the type0 and type1 atom, type0 is closed atoms, type1 is open atoms 
-    step 2: check the open atoms, whether connected or connected with same atoms 
-    step 3: if connected or connected with same atoms, add the same atom and they are now closed atoms
-    step 4: check whether all opened is single bond 
-    step 5: if no, increase the double bond atoms
-    step 6: get the type0 and type1 atoms
-    step 7: check the open atoms, whether connected or connected with same atoms 
-    ...
     """
-    
     _frgs = []
     for frg in frgs:
         _frgs.extend(frg)
@@ -162,39 +152,17 @@ def cluster_gen(frgs, cov_idx, bond_type, symbol):
                 pass
             else:
                 bounder_atom.append(ii)
-
-    # !!!! pay attention to the bounder and unbounder atoms definition 
-
     bounder_atom = list(set(bounder_atom))
-    unbounder_atom = list(set(_frgs) - set(bounder_atom))
+    nonbounder_atom = list(set(_frgs) - set(bounder_atom))
 
     # add the hydrogen or heavy atom now
-    _frgs_filt = unbounder_atom; _pair = []
-    for ii in bounder_atom:
-        nei = np.where(cov_idx[ii] == 1)[0]
-        double_bond = False; double_type = -1
-        for jj in nei:
-            if _bond_type[(ii,jj)] > 1 and jj not in unbounder_atom:
-                double_bond = True
-                if symbol[ii] == 'C' and symbol[jj] == 'C':
-                    double_type = 0
-                else:
-                    double_type = 1
+    _frgs_filt = bounder_atom; _pair = []
+    #for atom in nonbounder_atom:
         # if all conneted is single bond
-        if double_bond == False
-            unbounder_atom.append(ii)
-            for jj in nei:
-                if jj in unbounder_atom:
-                    pass
-                else:
-                    _pair.append([ii,jj])
-        else:
-        # if have one double bond 
-            if double_type == 0:
-                for 
-                # case1 C=C
-            elif double_type == 1:
-                # case2 non C=C
+
+        # if only one double bond 
+
+        # if two doublue bond
 
 
     # avoid the ring atoms i and j are too near 
@@ -320,64 +288,12 @@ def frag_search(cen_idx,nei_idx,covalent_map,bond,symbol,n_heavy):
 
 if __name__ == '__main__':
     from ase.io import read
-    mol = read('tripeptide.pdb')
+    mol = read('polypep.pdb')
     symbol = mol.get_chemical_symbols()
     coord = mol.get_positions()
-    solute_n = 29; Rc = 4.
-    coord_n = coord[0:solute_n]; symbol_n = symbol[0:solute_n]; n_heavy = 6
-    # using openbabel to get the bond 
-    bond_n = _crd2frag(symbol_n, coord_n)
+    bond_n = _crd2frag(symbol, coord)#; bond_n = sorted(bond_n)
+    bond_n = (np.array(bond_n)+1)
+    for bond in bond_n:
+        if bond[0] == 65:
+            print(bond)
     
-    print(bond_n)
-    # check bond by mdanalysis and ourself, for charged system, 
-    # both openbabel and mdanalysis need specific the charged position manually
-    solute = MDAnalysis.Universe('tripeptide_gas.prmtop','tripeptide_gas.pdb')
-    bonds = solute.bonds.indices; symbols = solute.atoms.elements
-    bond_n_mda = _bonder(bonds,symbols)
-    if len(bond_n) != len(bond_n_mda):
-        print('attention, the openbabel miss some bonds')
-    # obtain the bond and bond order in sol 
-    coord_sol = coord[solute_n:]; symbol_sol = symbol[solute_n:]
-    bond_sol = _crd2frag(symbol_sol,coord_sol)
-    bond_sol = np.array(bond_sol); bond_n_mda = np.array(bond_n_mda)
-    
-    # merge the bond data
-    bond_sol[:,:-1] += (np.max(bond_n)+1)
-    bond = list(bond_n_mda) + list(bond_sol)
-    
-    # covalent_map = generate_covalent_map(bond_n_mda)
-    covalent_map = generate_covalent_map(bond)
-    
-    # the bond and the covalent map can be used for frag gen
-    # here use atom i as example 
-    atom_idx = 15
-    # step 1, get the distance atoms
-    coord_mat = cdist(coord,coord,'euclidean')
-    
-    # step 2, accoring the model devi order, define the visited atoms, if interval atom i and j  <= 3, added to visited atoms
-    # not generate frag
-
-    # step 3, generate frag; may need functional later 
-    dis_mat = coord_mat[atom_idx]; nei_idx = np.where(dis_mat < Rc)[0]
-
-    # get the frag 
-    ligs = frag_search(atom_idx,nei_idx,covalent_map,bond,symbol,n_heavy)
-
-    # get the frag with limited size 
-    ligs = frag_gen(ligs, covalent_map, symbol, n_heavy = 8)
-
-    # add hydrogen atoms or heavy atoms for bond saturation
-    #cluster_gen()
-
-    frg_idx_fins = []; hydro_idxs = []; coord_fins = []; symbol_fins = []
-    # if only one hydrogen atoms in nonboned frag, we neglected it !!!!!!!!!
-    for lig in ligs:
-        frg_idx_fin, hydro_idx, coord_fin, symbol_fin = frag_gen(lig[0], lig, covalent_map, coord, symbol, bond, n_heavy = 8)
-        frg_idx_fins.append(np.array(frg_idx_fin)+1)
-        #frg_idx_fins.append(frg_idx_fin)
-        hydro_idxs.append(np.array(hydro_idx)+1)
-        #hydro_idxs.append(hydro_idx)
-        coord_fins.append(coord_fin)
-        symbol_fins.append(symbol_fin)
-    print(frg_idx_fins)
-    print(hydro_idxs)
