@@ -106,9 +106,8 @@ def _bonder(bonds,symbols):
 maybe needed if molecule is too large
 """
 
-
 def frag_gen(ligs, cov_idx, symbol, n_heavy=8):
-    def _frag_gen(cen_idx, frg_idx, cov_idx, symbol):
+    def _frag_gen(cen_idx, frg_idx, cov_idx, symbol, n_heavy):
         n_atom = 0; frg_idx_fin = [cen_idx]
         for i in range(1,7):
             nei_idx = np.where(cov_idx[cen_idx] == i)[0]
@@ -186,10 +185,10 @@ def cluster_gen(frgs, cov_idx, bond_type, symbol):
                 new_idx = ii[1]
                 nei = np.where(cov_idx[new_idx] == 1)
                 for jj in nei:
-                    _open_atoms.append([new_idx, jj, bond_type[(new_idx, jj)])
+                    _open_atoms.append([new_idx, jj, bond_type[(new_idx, jj)]])
         return _open_atoms
 
-    def final_atom(all_atoms, cov_idx, bond_type):
+    def final_atom(all_atoms, cov_idx, bond_type, symbol):
         # determine the close atom, if close atom i j is both connected k, add k 
         close_atoms = []; open_atoms = []
         for ii in all_atoms:
@@ -220,69 +219,25 @@ def cluster_gen(frgs, cov_idx, bond_type, symbol):
                 _close_atoms.append(ii)
             else:
                 for jj in nei:
-                    assert(bond_type[(ii,jj)] < 2)
-                    _open_atoms.append([ii,jj,bond_type[(ii,jj)]])
+                    if jj not in all_atoms:
+                        assert(bond_type[(ii,jj)] < 2)
+                        #_open_atoms.append([ii,jj,bond_type[(ii,jj)]])
+                        # specific case: if only one hydrogen atom included, neglect it 
+                        if symbol[ii] == 'H':
+                            pass
+                        else:
+                            _open_atoms.append([ii,jj,bond_type[(ii,jj)]])
         return _close_atoms, _open_atoms
 
-    double_bond = False
+    double_bond = False; all_atoms = _frgs
     while double_bond == True:
         close_atoms, open_atoms, double_bond = all2close(all_atoms, cov_idx, _bond_type)
-        if double_bond == True:
-            open_atoms = doublebond_add(open_atoms)
-            all_atoms = list(close_atoms) + list([atom[0] for atom in open_atoms])
-            all_atoms = list(set(all_atoms)
-
-    _close_atoms, _open_atoms = final_atom(all_atoms, cov_idx, _bond_type)
-    return _close_atom, _open_atoms 
-
-def frag_gen(cen_idx, frg_idx, cov_idx, coord, symbol, bond_type, n_heavy=8):
-    """
-    determine the size of the fragments
-    """ 
-    def add_hydron(c0,c1):
-        c_h = (c1 - c0)*1.05/np.linalg.norm(c1-c0) + c0 
-        return c_h
-    _bond_type = {}
-    for type0 in bond_type:
-        _bond_type[(type0[0],type0[1])] = type0[2]
-    frg_idx_fin = [cen_idx]; n_atom = 0 if symbol[cen_idx] == 'H' else 1
-    hydro_idx = []
-    # obtain the proper size frag
-    # !!! the cov_idx have problem, thus may only a vector but now is matrix
-    
-    for i in range(1,7):
-        nei_idx = np.where(cov_idx[cen_idx] == i)[0]
-        for j in nei_idx:
-            if n_atom >= n_heavy:
-                continue
-            else:
-                if j in frg_idx:
-                    if symbol[j] != 'H':
-                        n_atom += 1
-                    frg_idx_fin.append(j)
-
-    # add atoms in frg_idx_fin for bond saturation
-    # !!!! have problem, we should add after merge all teh frag
-    for ii in frg_idx_fin:
-        nei = np.where(cov_idx[ii] == 1)[0]
-        for jj in nei:
-            if jj not in frg_idx_fin:
-                if _bond_type[(ii,jj)] > 1:
-                    frg_idx_fin.append(jj)
-                    nei = np.where(cov_idx[jj] == 1)[0]
-                    for kk in nei:
-                        if kk not in frg_idx_fin:
-                            hydro_idx.append([jj,kk])
-                else:
-                    hydro_idx.append([ii,jj])
-
-    coord_fin = [coord[u] for u in frg_idx_fin]
-    symbol_fin = [symbol[u] for u in frg_idx_fin]
-    for ii in hydro_idx:
-        symbol_fin.append('H')
-        h_coord = add_hydron(coord[ii[0]],coord[ii[1]])
-        coord_fin.append(h_coord)
-    return frg_idx_fin, hydro_idx, coord_fin, symbol_fin 
+        #if double_bond == True:
+        open_atoms = doublebond_add(open_atoms)
+        all_atoms = list(close_atoms) + list([atom[0] for atom in open_atoms])
+        all_atoms = list(set(all_atoms))
+    _close_atoms, _open_atoms = final_atom(all_atoms, cov_idx, _bond_type, symbol)
+    return _close_atoms, _open_atoms 
 
 def gencom(close_atom, open_atom, coord, symbol):
     def hydro_add(atom_idx, coord):
@@ -360,17 +315,29 @@ def frag_search(cen_idx,nei_idx,covalent_map,bond,symbol,n_heavy):
             assert(cen_idx == None)
     return ligs
 
+def write_com(coord,symbol):
+    with open('test.com','w') as fp:
+        fp.write('# pm6'+'\n')
+        fp.write('\n')
+        fp.write('DPGEN'+'\n')
+        fp.write('\n'); fp.write('0 1'+'\n')
+        for ss,cc in zip(symbol, coord):
+            fp.write('%s %.6f %.6f %.6f' %(ss, cc[0], cc[1], cc[2])+'\n')
+        fp.write('\n')
+    return 
+
 if __name__ == '__main__':
     from ase.io import read
     mol = read('tripeptide.pdb')
     symbol = mol.get_chemical_symbols()
+    symbol = [ss[0] for ss in symbol]
     coord = mol.get_positions()
     solute_n = 29; Rc = 4.
     coord_n = coord[0:solute_n]; symbol_n = symbol[0:solute_n]; n_heavy = 6
     # using openbabel to get the bond 
     bond_n = _crd2frag(symbol_n, coord_n)
     
-    print(bond_n)
+    #print(bond_n)
     # check bond by mdanalysis and ourself, for charged system, 
     # both openbabel and mdanalysis need specific the charged position manually
     solute = MDAnalysis.Universe('tripeptide_gas.prmtop','tripeptide_gas.pdb')
@@ -414,6 +381,8 @@ if __name__ == '__main__':
     # finally add hydrogen on open atoms for bond saturation 
     coord_cluster, symbol_cluster = gencom(close_atom, open_atom, coord, symbol) 
 
+    # write the input com 
+    write_com(coord_cluster, symbol_cluster)
 
     #frg_idx_fins = []; hydro_idxs = []; coord_fins = []; symbol_fins = []
     # if only one hydrogen atoms in nonboned frag, we neglected it !!!!!!!!!
