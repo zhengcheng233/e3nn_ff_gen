@@ -141,74 +141,99 @@ def cluster_gen(frgs, cov_idx, bond_type, symbol):
     step 7: check the open atoms, whether connected or connected with same atoms 
     ...
     """
-    
-    _frgs = []
-    for frg in frgs:
-        _frgs.extend(frg)
-    _frgs = list(set(_frgs))
-    
     # get the bond_type
     _bond_type = {}
     for type0 in bond_type:
         _bond_type[(type0[0],type0[1])] = type0[2]
 
-    # add atoms; _frgs record the real atoms
-    _hydro_pair = []; bounder_atom = [] 
-    for ii in _frgs:
-        nei = np.where(cov_idx[ii] == 1)[0]
-        for jj in nei:
-            # whether in frag
-            if jj in _frgs:
-                pass
-            else:
-                bounder_atom.append(ii)
+    # get the primary frags
+    _frgs = []
+    for frg in frgs:
+        _frgs.extend(frg)
+    _frgs = list(set(_frgs))
 
-    # !!!! pay attention to the bounder and unbounder atoms definition 
-
-    bounder_atom = list(set(bounder_atom))
-    unbounder_atom = list(set(_frgs) - set(bounder_atom))
-
-    # add the hydrogen or heavy atom now
-    _frgs_filt = unbounder_atom; _pair = []
-    for ii in bounder_atom:
-        nei = np.where(cov_idx[ii] == 1)[0]
-        double_bond = False; double_type = -1
-        for jj in nei:
-            if _bond_type[(ii,jj)] > 1 and jj not in unbounder_atom:
-                double_bond = True
-                if symbol[ii] == 'C' and symbol[jj] == 'C':
-                    double_type = 0
-                else:
-                    double_type = 1
-        # if all conneted is single bond
-        if double_bond == False
-            unbounder_atom.append(ii)
+    # obtain the initial closed and open atoms 
+    # close atoms means all the conn atoms are in close atoms or the first line of open atoms
+    # open atoms means part of the conn atoms are in close or first line of open atoms, while the others are ghost atoms and in the second line of open atoms
+    # we need check 1. in open atoms if i and j in first line and second line due to the double bond added, then may be they will change to close atoms 
+    # after all atoms are close or open atoms with single bond, we need check if i and j both connected with k, then k should be added 
+    # close_atoms n * 1; open_atoms n * 3
+    def all2close(all_atoms, cov_idx, bond_type):
+        # obtain the open and close atoms 
+        close_atoms = []; open_atoms = []; double_bond = False
+        for ii in all_atoms:
+            nei = np.where(cov_idx[ii] == 1)[0]; closed = True
             for jj in nei:
-                if jj in unbounder_atom:
-                    pass
+                if jj not in all_atoms:
+                    closed = False
+            if closed == True:
+                close_atoms.append(ii)
+            else:
+                for jj in nei:
+                    open_atoms.append([ii,jj,bond_type[(ii,jj)]])
+        # then ensure whether have double_bond with ghost atoms
+        for ii in open_atoms:
+            if ii[-1] > 1:
+                double_bond = True
+        return close_atoms, open_atoms, double_bond
+
+    def doublebond_add(open_atoms, cov_idx, bond_type):
+        # add the double bond atoms 
+        _open_atoms = []
+        for ii in open_atoms:
+            _open_atoms.append(ii)
+            if ii[-1] > 1:
+                new_idx = ii[1]
+                nei = np.where(cov_idx[new_idx] == 1)
+                for jj in nei:
+                    _open_atoms.append([new_idx, jj, bond_type[(new_idx, jj)])
+        return _open_atoms
+
+    def final_atom(all_atoms, cov_idx, bond_type):
+        # determine the close atom, if close atom i j is both connected k, add k 
+        close_atoms = []; open_atoms = []
+        for ii in all_atoms:
+            nei = np.where(cov_idx[ii] == 1)[0]; closed = True
+            for jj in nei:
+                if jj not in all_atoms:
+                    closed = False
+            if closed == True:
+                close_atoms.append(ii)
+            else:
+                for jj in nei:
+                    open_atoms.append([ii,jj,bond_type[(ii,jj)]])
+        # find type k atoms 
+        ghost_idx = []
+        for ii in open_atoms:
+            if ii[1] not in all_atoms:
+                if ii[1] in ghost_idx:
+                    all_atoms.append(ii[1])
                 else:
-                    _pair.append([ii,jj])
-        else:
-        # if have one double bond 
-            if double_type == 0:
-                for 
-                # case1 C=C
-            elif double_type == 1:
-                # case2 non C=C
+                    ghost_idx.append(ii[1])
+        _close_atoms = []; _open_atoms = []
+        for ii in all_atoms:
+            nei = np.where(cov_idx[ii] == 1)[0]; closed = True
+            for jj in nei:
+                if jj not in all_atoms:
+                    closed = False
+            if closed == True:
+                _close_atoms.append(ii)
+            else:
+                for jj in nei:
+                    assert(bond_type[(ii,jj)] < 2)
+                    _open_atoms.append([ii,jj,bond_type[(ii,jj)]])
+        return _close_atoms, _open_atoms
 
+    double_bond = False
+    while double_bond == True:
+        close_atoms, open_atoms, double_bond = all2close(all_atoms, cov_idx, _bond_type)
+        if double_bond == True:
+            open_atoms = doublebond_add(open_atoms)
+            all_atoms = list(close_atoms) + list([atom[0] for atom in open_atoms])
+            all_atoms = list(set(all_atoms)
 
-    # avoid the ring atoms i and j are too near 
-    #_frgs_filt = nonbounder_atom; 
-    #for ii in range(len(bounder_atom)):
-    #    for jj in range(i+1, len(bounder_atom)):
-    #        idx0 = bounder_atom[ii]; idx1 = bounder_atom[jj]
-    #        nei0 = np.where(cov_idx[idx0] == 1)[0]; nei1 = np.where(cov_idx[idx1] == 1)[0]
-    #        if ( len(set(nei0) & set(nei1)) > 0):
-    #            pass
-    #        else:
-    #            _frgs_filt.append(idx0)
-
-    return 
+    _close_atoms, _open_atoms = final_atom(all_atoms, cov_idx, _bond_type)
+    return _close_atom, _open_atoms 
 
 def frag_gen(cen_idx, frg_idx, cov_idx, coord, symbol, bond_type, n_heavy=8):
     """
@@ -258,6 +283,23 @@ def frag_gen(cen_idx, frg_idx, cov_idx, coord, symbol, bond_type, n_heavy=8):
         h_coord = add_hydron(coord[ii[0]],coord[ii[1]])
         coord_fin.append(h_coord)
     return frg_idx_fin, hydro_idx, coord_fin, symbol_fin 
+
+def gencom(close_atom, open_atom, coord, symbol):
+    def hydro_add(atom_idx, coord):
+        axis = (coord[atom_idx[1]] - coord[atom_idx[0]])
+        axis = axis / np.linalg.norm(axis)
+        coord_h = coord[atom_idx[0]] + axis * 1.05 
+        return coord_h
+
+    coord_cluster = []; symbol_cluster = []
+    for ii in close_atom:
+        coord_cluster.append(coord[ii]); symbol_cluster.append(symbol[ii])
+    for ii in open_atom:
+        coord_cluster.append(coord[ii[0]]); symbol_cluster.append(symbol[ii[0]])
+        symbol_cluster.append('H')
+        coord_h = hydro_add(ii[0:2],coord)
+        coord_cluster.append(coord_h)
+    return coord_cluster, symbol_cluster 
 
 def frag_search(cen_idx,nei_idx,covalent_map,bond,symbol,n_heavy):
     """
@@ -366,18 +408,22 @@ if __name__ == '__main__':
     # get the frag with limited size 
     ligs = frag_gen(ligs, covalent_map, symbol, n_heavy = 8)
 
-    # add hydrogen atoms or heavy atoms for bond saturation
-    #cluster_gen()
+    # add heavy atoms for double bond and get the open atoms
+    close_atom, open_atom = cluster_gen(ligs, covalent_map, bond, symbol)
 
-    frg_idx_fins = []; hydro_idxs = []; coord_fins = []; symbol_fins = []
+    # finally add hydrogen on open atoms for bond saturation 
+    coord_cluster, symbol_cluster = gencom(close_atom, open_atom, coord, symbol) 
+
+
+    #frg_idx_fins = []; hydro_idxs = []; coord_fins = []; symbol_fins = []
     # if only one hydrogen atoms in nonboned frag, we neglected it !!!!!!!!!
-    for lig in ligs:
-        frg_idx_fin, hydro_idx, coord_fin, symbol_fin = frag_gen(lig[0], lig, covalent_map, coord, symbol, bond, n_heavy = 8)
-        frg_idx_fins.append(np.array(frg_idx_fin)+1)
+    #for lig in ligs:
+    #    frg_idx_fin, hydro_idx, coord_fin, symbol_fin = frag_gen(lig[0], lig, covalent_map, coord, symbol, bond, n_heavy = 8)
+    #    frg_idx_fins.append(np.array(frg_idx_fin)+1)
         #frg_idx_fins.append(frg_idx_fin)
-        hydro_idxs.append(np.array(hydro_idx)+1)
+    #    hydro_idxs.append(np.array(hydro_idx)+1)
         #hydro_idxs.append(hydro_idx)
-        coord_fins.append(coord_fin)
-        symbol_fins.append(symbol_fin)
-    print(frg_idx_fins)
-    print(hydro_idxs)
+    #    coord_fins.append(coord_fin)
+    #    symbol_fins.append(symbol_fin)
+    #print(frg_idx_fins)
+    #print(hydro_idxs)
