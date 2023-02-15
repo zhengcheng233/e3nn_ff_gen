@@ -15,13 +15,8 @@ from ase.md.md import process_temperature
 
 atomic_num = ase.data.atomic_numbers
 atomic_mass = ase.data.atomic_masses
-PARAMS = {'MDTemp':300,'MDdt':1.,'MNHChain':2,'MDMaxStep':1000,'MDV0':'Thermal','MDThermostat':'Langevin'}
-IDEALGASR = 8.3144621 # J/molK
-KJPERHARTREE = 2625.499638
+PARAMS = {'MDTemp':300,'MDdt':1.,'MDMaxStep':1000}
 fs = 1e-5 * np.sqrt(1.60217733e-19/1.6605402e-27)
-sym_dict = {'H':1,'C':6,'N':7,'O':8,'S':16}
-JOULEPERHARTREE = KJPERHARTREE*1000.0
-ATOMICMASSES = {1:1.008,6:12.011,7:14.007,8:15.999}
 kB = (1.380658e-23)/(1.602176462e-19)
 
 class Dimerclass():
@@ -133,6 +128,7 @@ class VelocityVerlet:
         self.calc = Dimerclass(center_point, indices, spring, threshold)
         energy, force = self.calc.E_and_F(coord, symbol, q_net) 
         self.Epot = energy; self.N = len(self.m)
+        self.v = self.Rescale(self.v)
         self.force = force
         self.q_net = q_net
         self.a = self.force / self.m 
@@ -177,6 +173,7 @@ class VelocityVerlet:
             self.KE = KineticEnergy(self.v,self.m); Teff = (2./3.)*self.KE/kB
             if step % self.snap == 0:
                 self.coord_save.append(self.x)
+            step += 1
         np.save('coord.npy',self.coord_save)
         return 
 
