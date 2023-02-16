@@ -15,7 +15,8 @@ from ase.md.md import process_temperature
 
 atomic_num = ase.data.atomic_numbers
 atomic_mass = ase.data.atomic_masses
-PARAMS = {'MDTemp':300,'MDdt':1.,'MDMaxStep':1000}
+PARAMS = {'MDTemp':300,'MDdt':1.,'MDMaxStep':30000}
+#PARAMS = {'MDTemp':300,'MDdt':1.,'MDMaxStep':20000}
 fs = 1e-5 * np.sqrt(1.60217733e-19/1.6605402e-27)
 kB = (1.380658e-23)/(1.602176462e-19)
 
@@ -178,5 +179,5 @@ class VelocityVerlet:
         return 
 
 # run the md simulation 
-md = VelocityVerlet(coord, symbol, center_point, indices, spring, threshold, q_net, 50)
+md = VelocityVerlet(coord, symbol, center_point, indices, spring, threshold, q_net, 400)
 md.Prop()
