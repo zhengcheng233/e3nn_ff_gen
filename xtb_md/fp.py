@@ -27,6 +27,8 @@ def make_fp(files,mdata,task_name):
             fp.write('#SBATCH -N 1'+'\n')
             fp.write('#SBATCH -n '+str(nproc)+'\n')
             #fp.write('#SBATCH --exclusive'+'\n')
+            fp.write('export OMP_NUM_THREADS=1'+'\n')
+            fp.write('export MKL_NUM_THREADS=1'+'\n')
             fp.write('mkdir -p /tmp/scratch/'+str(user_name)+'/'+task_name+'.$SLURM_JOB_ID'+'\n')
             for jj in ii:
                 file_name = os.path.basename(jj)
@@ -35,6 +37,8 @@ def make_fp(files,mdata,task_name):
                 dir_path = tmp_path 
                 fp.write('mkdir -p ' + dir_path + '\n')
                 fp.write('cp '+abs_path+'dimer_sapt.gjf '+ tmp_path+'\n')
+                fp.write('sleep 0.5'+'\n')
+                fp.write('cp '+abs_path+'dimer_num.txt '+ tmp_path+'\n')
                 fp.write('sleep 0.5'+'\n')
                 fp.write('cp '+_cwd+'/xtb_md.py '+ tmp_path+'\n') 
                 fp.write('sleep 0.5'+'\n')
