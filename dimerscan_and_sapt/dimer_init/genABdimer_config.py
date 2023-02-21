@@ -77,15 +77,17 @@ def data_read(f_inp,f_top):
             if len(line) == 2:
                 if line[-1] == '1':
                     proton = int(line[0])
+    num = len(coord) // 2
     bond_infor = []
     with open(f_top,'r') as fp:
         for idx,line in enumerate(fp):
             if idx > 0:
                 line = line.strip().split()
-                bond_tmp = [int(line[0]),int(line[1]),\
+                if int(line[0]) < num and int(line[1]) < num:
+                    bond_tmp = [int(line[0]),int(line[1]),\
                         int(line[2]),int(line[3]),int(line[4]),\
                         float(line[5])]
-                bond_infor.append(bond_tmp)
+                    bond_infor.append(bond_tmp)
     return coord, symbol, bond_infor, proton 
 
 def data_write(coord_A, symbol_A, coord_B, symbol_B, bond_infor_A, bond_infor_B, proton_A, proton_B):
@@ -139,9 +141,9 @@ if __name__ == '__main__':
 
     # generate A-A dimer 
     cwd = os.getcwd()
-    #for ii in range(0):
     for ii in range(len(coords_mono)):
         coord = coords_mono[ii]; symbol = symbols_mono[ii]; bond_infor = bond_infors[ii]; proton = protons[ii]
+        n_0 = check_n_heavy(symbol)
         direction = move_direction(coord, symbol)
         coord_n, symbol_n, bond_infor_n = move_monomer(coord, symbol, coord, symbol, bond_infor, r_max, direction, dr, len(coord))
         conf_name = 'conf.'+'%03d'%(ii)+'_'+'%03d'%(ii)
@@ -153,6 +155,7 @@ if __name__ == '__main__':
     # generate A-B dimer
     kk = 0
     cwd = os.getcwd()
+    #for ii in range(0):
     for ii in range(len(coords_mono)):
         for jj in range(ii+1,len(coords_mono)):
             coord0 = coords_mono[ii]; symbol0 = symbols_mono[ii]; bond_infor0 = bond_infors[ii]; proton0 = protons[ii]
