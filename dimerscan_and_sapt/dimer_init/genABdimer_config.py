@@ -77,7 +77,7 @@ def data_read(f_inp,f_top):
             if len(line) == 2:
                 if line[-1] == '1':
                     proton = int(line[0])
-    num = len(coord) // 2
+    num = len(coord)
     bond_infor = []
     with open(f_top,'r') as fp:
         for idx,line in enumerate(fp):
@@ -127,11 +127,15 @@ if __name__ == '__main__':
 
     coords_mono = []; symbols_mono = []; bond_infors = []; protons = []
 
+    #for idx,dir0 in enumerate(f_dirs):
+    #    if idx > 0:
+    #        continue
     for dir0 in f_dirs:   
         f_name = os.path.basename(dir0)
         f_dir = dir0[:-len(f_name)]
         os.chdir(f_dir)
         coord, symbol, bond_infor, proton = data_read(f_name,'topo.txt')
+        
         coords_mono.append(coord); symbols_mono.append(symbol)
         bond_infors.append(bond_infor); protons.append(proton)
         #direction = move_direction(coord, symbol)
