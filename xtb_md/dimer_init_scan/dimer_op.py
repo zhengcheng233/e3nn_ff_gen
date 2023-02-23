@@ -47,7 +47,7 @@ def get_dimer():
     for idx,cc in enumerate(coords):
         if reasons[idx] > 0.5:
             _coords.append(cc)
- 
+     
     return _coords, symbols, q_net, monA_idx, monB_idx
 
 def gen_molpro_output(coord, symbol, monA_idx, monB_idx, template_fn, ac_data, q_A, q_B, ofn=None, label=None):
@@ -221,7 +221,9 @@ def gen_scan(coord, symbol, monA_idx, monB_idx):
 #    return
 
 def gen_gjf(pos, symbol, q_net, ofn=None):
-    with open(ofn,'w') as fp:
+    ofname = ofn.split('.')[0]
+    os.system('mkdir ' + ofname)
+    with open(os.path.join(ofname,'input.gjf'),'w') as fp:
         fp.write('# pm6'+'\n')
         fp.write('\n'); fp.write('dpgen'+'\n')
         fp.write('\n'); fp.write('%s 1'%(str(q_net))+'\n')
@@ -276,14 +278,19 @@ def dimer_scan(n_sample):
             #gen_molpro_output(pos, symbol, monA_idx, monB_idx, 'mp2_template.com', np.array([[ip_a,homo_a],[ip_b,homo_b]]), q_A, q_B, ofn=ofn, label='shift = %.6f'%indices[i_data])
         return
     n_interval = int(len(coords) / n_sample); num = 0
-    for ii in range(0,len(coords),n_interval):
-        if num < n_sample:
-            confor_gen(ii, coords, symbols, monA_idx, monB_idx, q_net)
+    if n_interval < 1:
         num += 1
+        confor_gen(0, coords, symbols, monA_idx, monB_idx, q_net)
+    else:
+        for ii in range(0,len(coords),n_interval):
+            if num < n_sample:
+                confor_gen(ii, coords, symbols, monA_idx, monB_idx, q_net)
+            num += 1
+
     return 
 
 if __name__ == '__main__':
-    conf_files = glob('./conf.*'); n_sample = int(sys.argv[1])
+    conf_files = glob('./'); n_sample = int(sys.argv[1])
     cwd_ = os.getcwd()
 
     for dir0 in conf_files:

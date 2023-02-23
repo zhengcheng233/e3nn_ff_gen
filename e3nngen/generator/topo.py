@@ -71,7 +71,7 @@ def proton_transfer_check1(coord,symbol,idx_hydro,idx_0,n_atom_bond,bond_lengths
     if dis > bond_lengths[sym] * bond_lo_ratio and dis < bond_lengths[sym] * bond_hi_ratio:
         if symbol[idx_0] == 'N' and n_atom_bond[idx_0] < 5:
             proton_pair = True
-        if symbol[idx_0] == 'O' or symbol[idx_0] == 'S' and n_atom_bond[dis_ord] < 3:
+        if symbol[idx_0] == 'O' or symbol[idx_0] == 'S' and n_atom_bond[idx_0] < 3:
             proton_pari = True
     return proton_pair
 

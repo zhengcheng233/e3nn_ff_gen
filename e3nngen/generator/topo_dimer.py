@@ -66,6 +66,7 @@ def proton_transfer_check1(coord,symbol,idx_hydro,idx_0,n_atom_bond,bond_lengths
     c_hy = coord[idx_hydro]
     dis = np.sqrt(np.sum((coord[idx_0] - c_hy)**2))
 
+    dis_ord = np.argsort(dis)[1]
     #if proton_idx[idx_0] < 0:
     sym = tuple(sorted([symbol[idx_0],'H']))
     if dis > bond_lengths[sym] * bond_lo_ratio and dis < bond_lengths[sym] * bond_hi_ratio:

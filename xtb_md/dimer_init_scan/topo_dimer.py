@@ -11,17 +11,16 @@ import sys
 from scipy.spatial.distance import cdist
 from glob import glob
 import dpdata
-import os
 
-bond_hi_ratio = 1.4
-bond_lo_ratio = 0.8
-trj_freq = 20
-theory_n_frame = 100
+bond_hi_ratio = float(sys.argv[1])
+bond_lo_ratio = float(sys.argv[2])
+trj_freq = int(sys.argv[3])
+theory_n_frame = int(sys.argv[4])
 
-def topo_bond(num_atom,f_name0,f_name1):
+def topo_bond(num_atom):
     bonds = []; atom_pair_lengths = {}; proton_idx = [0]*num_atom
     bonds_lengths = {}
-    with open(f_name0,'r') as fp:
+    with open('conf.topo','r') as fp:
         for idx, line in enumerate(fp):
             if idx > 0:
                 line = line.strip().split()
@@ -30,7 +29,7 @@ def topo_bond(num_atom,f_name0,f_name1):
                 proton_idx[int(line[0])] = int(line[3])
                 proton_idx[int(line[1])] = int(line[4])
     
-    with open(f_name1,'r') as fp:
+    with open('conf.bondlength','r') as fp:
         for idx, line in enumerate(fp):
             if idx > 0:
                 line = line.strip().split()
@@ -72,7 +71,7 @@ def proton_transfer_check1(coord,symbol,idx_hydro,idx_0,n_atom_bond,bond_lengths
     if dis > bond_lengths[sym] * bond_lo_ratio and dis < bond_lengths[sym] * bond_hi_ratio:
         if symbol[idx_0] == 'N' and n_atom_bond[idx_0] < 5:
             proton_pair = True
-        if symbol[idx_0] == 'O' or symbol[idx_0] == 'S' and n_atom_bond[dis_ord] < 3:
+        if symbol[idx_0] == 'O' or symbol[idx_0] == 'S' and n_atom_bond[idx_0] < 3:
             proton_pari = True
     return proton_pair
 
@@ -172,55 +171,54 @@ def lammpsread(f_name):
                 coord.append([float(line1[2]),float(line1[3]),float(line1[4])])
     return coord
 
-if __name__ == '__main__':
-    type_map_0 = ['X','C','H','N','O','S']; symbol = []
-    with open('conf.lmp','r') as fp:
-        read_sym = False
-        for line in fp:
-            if 'Atoms' in line and 'atomic' in line:
-                read_sym = True
-            elif read_sym == True:
-                line1 = line.strip().split()
-                if len(line1) == 5:
-                    symbol.append(type_map_0[int(line1[1])])
-    
-    bonds, atom_pair_lengths, proton_idx, bonds_lengths = topo_bond(len(symbol))
-    n_lammps_files = len(glob('./traj/*.lammpstrj'))
-    
-    reasons = []
-    with open('reasonable.txt','w') as fp:
-        for ii in range(theory_n_frame):
-            if ii < n_lammps_files:
-                f_name = str(ii * trj_freq)+'.lammpstrj'
-                coord = lammpsread('./traj/'+f_name)
-                reasonable, cri_loose = reasonable_judge(coord,symbol,bonds,atom_pair_lengths,proton_idx,bonds_lengths)
-                if reasonable == True:
-                    reasons.append(1)
-                    # reasonable
-                    fp.write('1 1'+'\n')
-                else:
-                    reasons.append(0)
-                    if cri_loose == 1:
-                        # loose reasonable
-                        fp.write('0 1'+'\n')
-                    else:
-                        # unreasonable
-                        fp.write('0 0'+'\n')
-            else:
-                fp.write('0 0'+'\n')
-        
+type_map_0 = ['X','C','H','N','O','S']; symbol = []
+with open('conf.lmp','r') as fp:
+    read_sym = False
+    for line in fp:
+        if 'Atoms' in line and 'atomic' in line:
+            read_sym = True
+        elif read_sym == True:
+            line1 = line.strip().split()
+            if len(line1) == 5:
+                symbol.append(type_map_0[int(line1[1])])
+
+bonds, atom_pair_lengths, proton_idx, bonds_lengths = topo_bond(len(symbol))
+n_lammps_files = len(glob('./traj/*.lammpstrj'))
+
+reasons = []
+with open('reasonable.txt','w') as fp:
     for ii in range(theory_n_frame):
         if ii < n_lammps_files:
             f_name = str(ii * trj_freq)+'.lammpstrj'
-            if ii == 0:
-                system = dpdata.System('./traj/'+str(f_name),fmt='dump',type_map=type_map_0[1:])
+            coord = lammpsread('./traj/'+f_name)
+            reasonable, cri_loose = reasonable_judge(coord,symbol,bonds,atom_pair_lengths,proton_idx,bonds_lengths)
+            if reasonable == True:
+                reasons.append(1)
+                # reasonable
+                fp.write('1 1'+'\n')
             else:
-                if reasons[ii] == 1:
-                    system.append(dpdata.System('./traj/'+str(f_name),fmt='dump',type_map=type_map_0[1:]))
+                reasons.append(0)
+                if cri_loose == 1:
+                    # loose reasonable
+                    fp.write('0 1'+'\n')
                 else:
-                    system.append(dpdata.System('./traj/0.lammpstrj',fmt='dump',type_map=type_map_0[1:]))
+                    # unreasonable
+                    fp.write('0 0'+'\n')
         else:
-            system.append(dpdata.System('./traj/0.lammpstrj',fmt='dump',type_map=type_map_0[1:]))
+            fp.write('0 0'+'\n')
     
-    system.nopbc = True
-    system.to_deepmd_npy('traj_deepmd')
+for ii in range(theory_n_frame):
+    if ii < n_lammps_files:
+        f_name = str(ii * trj_freq)+'.lammpstrj'
+        if ii == 0:
+            system = dpdata.System('./traj/'+str(f_name),fmt='dump',type_map=type_map_0[1:])
+        else:
+            if reasons[ii] == 1:
+                system.append(dpdata.System('./traj/'+str(f_name),fmt='dump',type_map=type_map_0[1:]))
+            else:
+                system.append(dpdata.System('./traj/0.lammpstrj',fmt='dump',type_map=type_map_0[1:]))
+    else:
+        system.append(dpdata.System('./traj/0.lammpstrj',fmt='dump',type_map=type_map_0[1:]))
+
+system.nopbc = True
+system.to_deepmd_npy('traj_deepmd')
