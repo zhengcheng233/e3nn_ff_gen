@@ -165,7 +165,7 @@ class VelocityVerlet:
             self.x, self.v, self.a, self.Epot, self.force  = self.step(self.a, self.x, self.v, self.m, self.dt, self.Epot, self.force, self.symbols, step)
             self.KE = KineticEnergy(self.v,self.m); Teff = (2./3.)*self.KE/kB
             dis_cur = np.linalg.norm(self.x[self.min_idx0] - self.x[self.min_idx1])
-            if dis_cur > self.min_dis + self.threshold or dis_cur < self.min_dis - self.threshold:
+            if dis_cur > self.min_dis + self.threshold or dis_cur < self.min_dis - self.threshold or dis_cur < 1.:
                 self.stop = True
             if self.stop == False:
                 reason,cri_lo = reasonable_judge(self.x,self.symbols,self.bonds,self.atom_pair_lengths,self.proton_idx,self.bonds_lengths) 
