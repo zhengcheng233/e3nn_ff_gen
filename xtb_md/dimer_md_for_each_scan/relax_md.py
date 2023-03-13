@@ -168,7 +168,10 @@ class VelocityVerlet:
             if dis_cur > self.min_dis + self.threshold or dis_cur < self.min_dis - self.threshold or dis_cur < 1.:
                 self.stop = True
             if self.stop == False:
-                reason,cri_lo = reasonable_judge(self.x,self.symbols,self.bonds,self.atom_pair_lengths,self.proton_idx,self.bonds_lengths) 
+                _symbol = []; sym_dict = {1:'H',6:'C',7:'N',8:'O',16:'S'}
+                for ss in self.symbols:
+                    _symbol.append(sym_dict[ss])
+                reason,cri_lo = reasonable_judge(self.x,_symbol,self.bonds,self.atom_pair_lengths,self.proton_idx,self.bonds_lengths) 
                 if reason == False:
                     self.stop = True
             #if step % self.snap == 0:
