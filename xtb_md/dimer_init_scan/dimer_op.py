@@ -22,7 +22,7 @@ def get_dimer():
         for ii in range(3,len(lines)):
             line = lines[ii].strip().split()
             if len(line) == 2:
-                q_net = int(line[-1])
+                q_net = int(line[0])
             elif len(line) == 4:
                 #coord.append([float(line[1]),float(line[2]),float(line[3])])
                 symbol.append(line[0])
