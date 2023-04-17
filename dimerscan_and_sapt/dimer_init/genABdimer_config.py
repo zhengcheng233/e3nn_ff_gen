@@ -77,21 +77,21 @@ def data_read(f_inp,f_top):
             if len(line) == 2:
                 if line[-1] == '1':
                     proton = int(line[0])
-    num = len(coord)
     bond_infor = []
     with open(f_top,'r') as fp:
         for idx,line in enumerate(fp):
             if idx > 0:
                 line = line.strip().split()
-                if int(line[0]) < num and int(line[1]) < num:
-                    bond_tmp = [int(line[0]),int(line[1]),\
+                bond_tmp = [int(line[0]),int(line[1]),\
                         int(line[2]),int(line[3]),int(line[4]),\
                         float(line[5])]
-                    bond_infor.append(bond_tmp)
+                bond_infor.append(bond_tmp)
     return coord, symbol, bond_infor, proton 
 
 def data_write(coord_A, symbol_A, coord_B, symbol_B, bond_infor_A, bond_infor_B, proton_A, proton_B):
     #with open('dimer_scan.gjf','w') as fp:
+    with open('charge.txt','w') as fp:
+        fp.write('%s %s' %(str(proton_A),str(proton_B))+'\n')
     with open('dimer_sapt.gjf','w') as fp:
         fp.write('%nproc=8'+'\n')
         fp.write('#wb97xd/6-31g* force'+'\n')
@@ -127,15 +127,11 @@ if __name__ == '__main__':
 
     coords_mono = []; symbols_mono = []; bond_infors = []; protons = []
 
-    #for idx,dir0 in enumerate(f_dirs):
-    #    if idx > 0:
-    #        continue
     for dir0 in f_dirs:   
         f_name = os.path.basename(dir0)
         f_dir = dir0[:-len(f_name)]
         os.chdir(f_dir)
         coord, symbol, bond_infor, proton = data_read(f_name,'topo.txt')
-        
         coords_mono.append(coord); symbols_mono.append(symbol)
         bond_infors.append(bond_infor); protons.append(proton)
         #direction = move_direction(coord, symbol)
